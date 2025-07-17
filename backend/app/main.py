@@ -370,3 +370,5 @@ class Admin(User):
         all_txns: List[Transaction] = []
         for u in users:
             all_txns.extend(u.wallet.transactions)
+
+        return all_txns
