@@ -359,7 +359,7 @@ class Admin(User):
 
     def view_user_transactions(self, user: User) -> List[Transaction]:
         """
-        Посмотреть историю транзакций конкретного пользователя.
+        Посмотреть историю транзакций конкретного пользователя
         """
         return user.wallet.transactions
 
