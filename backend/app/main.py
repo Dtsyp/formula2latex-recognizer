@@ -101,7 +101,7 @@ class Wallet:
 
     def top_up(self, amount: Decimal) -> TopUpTransaction:
         """
-        Создаёт транзакцию пополнения, сразу одобряет и применяет её
+        Создаёт транзакцию пополнения
         """
         txn = TopUpTransaction(
             id=uuid4(),
