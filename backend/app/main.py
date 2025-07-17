@@ -16,9 +16,9 @@ class Transaction(ABC):
     ):
         self._id: UUID = id
         self._wallet_id: UUID = wallet_id
-        self._amount: Decimal = amount
-        self._timestamp: datetime.datetime = timestamp
-        self._post_balance: Decimal = post_balance
+        self._amount: Decimal = amount # Сумма: при списании < 0, при пополнении > 0
+        self._timestamp: datetime.datetime = timestamp # Дата транзакции
+        self._post_balance: Decimal = post_balance # Баланс после совершения транзакции
 
     @property
     def id(self) -> UUID:
