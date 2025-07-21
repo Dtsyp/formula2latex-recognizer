@@ -1,0 +1,43 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    volumes:
+      - ./src:/app/src
+    depends_on:
+      - database
+      - rabbitmq
+
+  web-proxy:
+    image: nginx:latest
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./src/infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    restart: on-failure
+
+  database:
+    image: postgres:latest
+    env_file:
+      - .env
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  rabbitmq-data:
+  postgres-data:
