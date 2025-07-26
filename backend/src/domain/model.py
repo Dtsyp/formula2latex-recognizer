@@ -1,10 +1,10 @@
-from uuid import UUID
-from decimal import Decimal
 from abc import ABC, abstractmethod
-from file import File
+from decimal import Decimal
 from typing import Any
+from uuid import UUID
 
-# Единый интерфейс моделей
+from domain.file import File
+
 class MLModel(ABC):
     def __init__(self, id: UUID, name: str, credit_cost: Decimal):
         self._id = id
@@ -21,31 +21,15 @@ class MLModel(ABC):
 
     @property
     def credit_cost(self) -> Decimal:
-        """
-        Стоимость (сколько будет списано) за один запрос в модель
-        """
+        """Стоимость за один запрос в модель."""
         return self._credit_cost
 
     @abstractmethod
     def preprocess(self, file: File) -> Any:
-        """
-        Подготовка входных данных
-        """
+        """Подготовка входных данных."""
         pass
 
     @abstractmethod
     def predict(self, data: Any) -> str:
-        """
-        Прогон данных через модель
-        """
+        """Прогон данных через модель."""
         pass
-
-# Пример с конкретной моделью
-# class FormulaCRNNModel(MLModel):
-#     def preprocess(self, file: File) -> Image:
-#         # загружаем картинку, конвертируем в grayscale, ресайз
-#         pass
-#
-#     def predict(self, data: Image) -> str:
-#         # прогон через CRNN, декодирование CTC → строка LaTeX
-#         pass

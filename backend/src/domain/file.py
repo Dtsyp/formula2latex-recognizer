@@ -4,11 +4,9 @@ class File:
         self._content_type = content_type
         self._validate()
 
-    # Валидация загруженного файла
     def _validate(self) -> None:
         if not self._content_type.startswith('image/'):
             raise ValueError("Поддерживаются только изображения")
-        # можно добавить проверку размера, разрешения и тп
 
     @property
     def path(self) -> str:
