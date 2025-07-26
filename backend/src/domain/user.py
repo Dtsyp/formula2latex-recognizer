@@ -1,19 +1,21 @@
-from uuid import UUID, uuid4
-from wallet import Wallet, Transaction, TopUpTransaction
-from task import RecognitionTask
 from decimal import Decimal
-from file import File
-from model import MLModel
 from typing import List
+from uuid import UUID, uuid4
 
-# Пользователь
+from domain.file import File
+from domain.model import MLModel
+from domain.task import RecognitionTask
+from domain.wallet import Wallet, Transaction, TopUpTransaction
+
 class User:
+    """Пользователь системы."""
+
     def __init__(
-            self,
-            id: UUID,
-            email: str,
-            password_hash: str,
-            wallet: Wallet
+        self,
+        id: UUID,
+        email: str,
+        password_hash: str,
+        wallet: Wallet
     ):
         self._id = id
         self._email = email
@@ -35,7 +37,6 @@ class User:
 
     @property
     def tasks(self) -> List[RecognitionTask]:
-        # возвращаем копию, чтобы избежать внешних модификаций
         return list(self._tasks)
 
     def _validate_email(self, email: str) -> None:
@@ -50,10 +51,7 @@ class User:
         return self.tasks
 
     def execute_task(self, file: File, model: MLModel) -> RecognitionTask:
-        """
-        Создаёт задачу RecognitionTask, выполняет её и сохраняет в историю
-        """
-        # 1. Создаём новую задачу
+        """Создает задачу RecognitionTask, выполняет её и сохраняет в историю."""
         task = RecognitionTask(
             id=uuid4(),
             user_id=self._id,
@@ -61,18 +59,13 @@ class User:
             model=model
         )
 
-        # 2. Выполняем — внутри обработается ошибка и спишутся кредиты только при успехе
         task.execute(self._wallet)
-
-        # 3. Сохраняем задачу в своей истории
         self._tasks.append(task)
 
         return task
 
     def change_email(self, next_email: str) -> bool:
-        """
-        Сменить email, если новый валиден и отличается от старого.
-        """
+        """Сменить email, если новый валиден и отличается от старого."""
         self._validate_email(next_email)
         if next_email == self._email:
             return False
@@ -80,11 +73,9 @@ class User:
         return True
 
     def change_password(self, prev_password: str, next_password: str) -> bool:
-        """
-        Сменить пароль: проверяем корректность предыдущего,
+        """Сменить пароль: проверяем корректность предыдущего,
         валидируем новый и обновляем хэш.
         """
-        # _check_password — приватный метод для сверки хэша
         if not self._check_password(prev_password):
             return False
 
@@ -94,25 +85,23 @@ class User:
 
         self._password_hash = self._hash_password(next_password)
         return True
-
-    # Приватные вспомогательные методы:
     def _check_password(self, password: str) -> bool:
-        """
-        Сравниваем hash(password) с self._password_hash
-        """
+        """Сравниваем hash(password) с self._password_hash."""
+        pass
 
     def _hash_password(self, password: str) -> str:
-        """
-        Возвращаем новый хэш
-        """
+        """Возвращаем новый хэш."""
+        pass
 
 class Admin(User):
+    """Администратор системы."""
+
     def __init__(
-            self,
-            id: UUID,
-            email: str,
-            password_hash: str,
-            wallet: Wallet
+        self,
+        id: UUID,
+        email: str,
+        password_hash: str,
+        wallet: Wallet
     ):
         super().__init__(id, email, password_hash, wallet)
         self._role = "admin"
@@ -122,23 +111,16 @@ class Admin(User):
         return self._role
 
     def top_up_user(self, user: User, amount: Decimal) -> TopUpTransaction:
-        """
-        Админ может напрямую пополнить баланс любого пользователя
-        """
-        # Создаём транзакцию пополнения на кошельке пользователя
+        """Админ может напрямую пополнить баланс любого пользователя."""
         txn = user.wallet.top_up(amount)
         return txn
 
     def view_user_transactions(self, user: User) -> List[Transaction]:
-        """
-        Посмотреть историю транзакций конкретного пользователя
-        """
+        """Посмотреть историю транзакций конкретного пользователя."""
         return user.wallet.transactions
 
     def view_all_transactions(self, users: List[User]) -> List[Transaction]:
-        """
-        Составить общий список транзакций по списку пользователей
-        """
+        """Составить общий список транзакций по списку пользователей."""
         all_txns: List[Transaction] = []
         for u in users:
             all_txns.extend(u.wallet.transactions)
