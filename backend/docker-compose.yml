@@ -11,6 +11,23 @@ services:
       - database
       - rabbitmq
 
+  telegram-bot:
+    build:
+      context: .
+      dockerfile: src/Dockerfile
+    command: python src/telegram_bot/main.py
+    env_file:
+      - .env
+    environment:
+      - API_BASE_URL=http://app:8000
+    volumes:
+      - ./src:/app/src
+      - ./user_sessions.json:/app/user_sessions.json
+    depends_on:
+      - app
+      - database
+    restart: unless-stopped
+
   web-proxy:
     image: nginx:1.25.3
     depends_on:
