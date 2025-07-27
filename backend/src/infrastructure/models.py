@@ -20,20 +20,20 @@ class TransactionType(enum.Enum):
     TOP_UP = "top_up"
     SPEND = "spend"
 
-class UserModel(Base):
+class User(Base):
     __tablename__ = "users"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email = Column(String(255), unique=True, nullable=False)
-    password_hash = Column(String(255), nullable=False)
+    password = Column(String(255), nullable=False)
     role = Column(SQLEnum(UserRole), default=UserRole.USER, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    wallet = relationship("WalletModel", back_populates="owner", uselist=False, cascade="all, delete-orphan")
-    tasks = relationship("TaskModel", back_populates="user", cascade="all, delete-orphan")
+    wallet = relationship("Wallet", back_populates="owner", uselist=False, cascade="all, delete-orphan")
+    tasks = relationship("Task", back_populates="user", cascade="all, delete-orphan")
 
-class WalletModel(Base):
+class Wallet(Base):
     __tablename__ = "wallets"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -42,10 +42,10 @@ class WalletModel(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    owner = relationship("UserModel", back_populates="wallet")
-    transactions = relationship("TransactionModel", back_populates="wallet", cascade="all, delete-orphan")
+    owner = relationship("User", back_populates="wallet")
+    transactions = relationship("Transaction", back_populates="wallet", cascade="all, delete-orphan")
 
-class TransactionModel(Base):
+class Transaction(Base):
     __tablename__ = "transactions"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -55,9 +55,9 @@ class TransactionModel(Base):
     post_balance = Column(DECIMAL(10, 2), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    wallet = relationship("WalletModel", back_populates="transactions")
+    wallet = relationship("Wallet", back_populates="transactions")
 
-class MLModelModel(Base):
+class MLModel(Base):
     __tablename__ = "ml_models"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -67,9 +67,9 @@ class MLModelModel(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    tasks = relationship("TaskModel", back_populates="model")
+    tasks = relationship("Task", back_populates="model")
 
-class FileModel(Base):
+class File(Base):
     __tablename__ = "files"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -79,9 +79,9 @@ class FileModel(Base):
     size = Column(Integer)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    tasks = relationship("TaskModel", back_populates="file")
+    tasks = relationship("Task", back_populates="file")
 
-class TaskModel(Base):
+class Task(Base):
     __tablename__ = "tasks"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -96,6 +96,6 @@ class TaskModel(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    user = relationship("UserModel", back_populates="tasks")
-    file = relationship("FileModel", back_populates="tasks")
-    model = relationship("MLModelModel", back_populates="tasks")
+    user = relationship("User", back_populates="tasks")
+    file = relationship("File", back_populates="tasks")
+    model = relationship("MLModel", back_populates="tasks")

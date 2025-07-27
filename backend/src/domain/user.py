@@ -39,6 +39,10 @@ class User:
     def tasks(self) -> List[RecognitionTask]:
         return list(self._tasks)
 
+    @property
+    def password_hash(self) -> str:
+        return self._password_hash
+
     def _validate_email(self, email: str) -> None:
         if "@" not in email or len(email) < 5:
             raise ValueError("Некорректный email")
@@ -59,8 +63,20 @@ class User:
             model=model
         )
 
-        task.execute(self._wallet)
-        self._tasks.append(task)
+        # Проверяем баланс перед выполнением
+        if self._wallet.balance < task.credits_charged:
+            raise RuntimeError("Недостаточно кредитов")
+
+        try:
+            task.execute()
+        except Exception as e:
+            # Если произошла ошибка во время выполнения, средства остаются на балансе
+            self._tasks.append(task)
+            raise
+        else:
+            # Списываем средства только при успешном выполнении
+            self._wallet.spend(task.credits_charged)
+            self._tasks.append(task)
 
         return task
 

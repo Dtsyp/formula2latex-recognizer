@@ -4,7 +4,6 @@ from uuid import UUID, uuid4
 
 from domain.file import File
 from domain.model import MLModel
-from domain.wallet import Wallet
 
 class RecognitionTask:
     """Задача распознавания формул."""
@@ -47,25 +46,20 @@ class RecognitionTask:
     def credits_charged(self):
         return self._credits_charged
 
-    def execute(self, wallet: Wallet) -> None:
+    def execute(self) -> None:
         """
         Выполнение задачи: предобработка + предсказание
-        Списываем кредиты только если оба этапа прошли без ошибок
-        В случае ошибки сохраняем её и оставляем баланс нетронутым
+        Логика списания кредитов теперь в User.execute_task
         """
         try:
-            if wallet.balance < self._credits_charged:
-                raise RuntimeError("Недостаточно кредитов")
             preprocessed = self._model.preprocess(self._file)
             result = self._model.predict(preprocessed)
-
+            self._output = result
+            self._status = "done"
         except Exception as e:
             self._status = "error"
             self._error = str(e)
-            return
-        wallet.spend(self._credits_charged)
-        self._output = result
-        self._status = "done"
+            raise
 
     @property
     def result(self) -> Optional[str]:

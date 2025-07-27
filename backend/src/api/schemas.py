@@ -54,6 +54,8 @@ class MLModelResponse(BaseModel):
         from_attributes = True
 
 class PredictionRequest(BaseModel):
+    model_config = {"protected_namespaces": ()}
+    
     model_id: UUID
     file_content: str = Field(..., description="Base64 encoded file content")
     filename: str = Field(..., description="Original filename")

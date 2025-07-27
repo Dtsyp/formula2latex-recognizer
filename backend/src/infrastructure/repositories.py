@@ -5,21 +5,21 @@ from uuid import UUID
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
-from domain.file import File
-from domain.model import MLModel
+from domain.file import File as DomainFile
+from domain.model import MLModel as DomainMLModel
 from domain.task import RecognitionTask
-from domain.user import User, Admin
-from domain.wallet import Wallet, Transaction, TopUpTransaction, SpendTransaction
+from domain.user import User as DomainUser, Admin
+from domain.wallet import Wallet as DomainWallet, Transaction as DomainTransaction, TopUpTransaction, SpendTransaction
 from infrastructure.models import (
-    FileModel,
-    MLModelModel,
-    TaskModel,
+    File,
+    MLModel,
+    Task,
     TaskStatus,
-    TransactionModel,
+    Transaction,
     TransactionType,
-    UserModel,
+    User,
     UserRole,
-    WalletModel,
+    Wallet,
 )
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -30,37 +30,37 @@ class UserRepository:
     def __init__(self, db: Session) -> None:
         self.db = db
 
-    def create_user(self, email: str, password: str, role: str = "user") -> User:
+    def create_user(self, email: str, password: str, role: str = "user") -> DomainUser:
         password_hash = pwd_context.hash(password)
         
-        user_model = UserModel(
+        user_model = User(
             email=email,
-            password_hash=password_hash,
+            password=password_hash,
             role=UserRole.ADMIN if role == "admin" else UserRole.USER
         )
         self.db.add(user_model)
         self.db.flush()
         
-        wallet_model = WalletModel(owner_id=user_model.id)
+        wallet_model = Wallet(owner_id=user_model.id)
         self.db.add(wallet_model)
         self.db.commit()
         
         return self._model_to_domain(user_model)
 
-    def get_by_id(self, user_id: UUID) -> Optional[User]:
-        user_model = self.db.query(UserModel).filter(UserModel.id == user_id).first()
+    def get_by_id(self, user_id: UUID) -> Optional[DomainUser]:
+        user_model = self.db.query(User).filter(User.id == user_id).first()
         return self._model_to_domain(user_model) if user_model else None
 
-    def get_by_email(self, email: str) -> Optional[User]:
-        user_model = self.db.query(UserModel).filter(UserModel.email == email).first()
+    def get_by_email(self, email: str) -> Optional[DomainUser]:
+        user_model = self.db.query(User).filter(User.email == email).first()
         return self._model_to_domain(user_model) if user_model else None
 
-    def get_all(self) -> List[User]:
-        user_models = self.db.query(UserModel).all()
+    def get_all(self) -> List[DomainUser]:
+        user_models = self.db.query(User).all()
         return [self._model_to_domain(model) for model in user_models]
 
-    def update_user(self, user: User) -> User:
-        user_model = self.db.query(UserModel).filter(UserModel.id == user.id).first()
+    def update_user(self, user: DomainUser) -> DomainUser:
+        user_model = self.db.query(User).filter(User.id == user.id).first()
         if user_model:
             user_model.email = user.email
             self.db.commit()
@@ -69,7 +69,7 @@ class UserRepository:
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
         return pwd_context.verify(plain_password, hashed_password)
 
-    def _model_to_domain(self, user_model: UserModel) -> Optional[User]:
+    def _model_to_domain(self, user_model: User) -> Optional[DomainUser]:
         if not user_model:
             return None
             
@@ -80,14 +80,14 @@ class UserRepository:
             return Admin(
                 id=user_model.id,
                 email=user_model.email,
-                password_hash=user_model.password_hash,
+                password_hash=user_model.password,
                 wallet=wallet
             )
         else:
-            return User(
+            return DomainUser(
                 id=user_model.id,
                 email=user_model.email,
-                password_hash=user_model.password_hash,
+                password_hash=user_model.password,
                 wallet=wallet
             )
 
@@ -97,27 +97,27 @@ class WalletRepository:
     def __init__(self, db: Session) -> None:
         self.db = db
 
-    def get_by_owner_id(self, owner_id: UUID) -> Optional[Wallet]:
-        wallet_model = self.db.query(WalletModel).filter(WalletModel.owner_id == owner_id).first()
+    def get_by_owner_id(self, owner_id: UUID) -> Optional[DomainWallet]:
+        wallet_model = self.db.query(Wallet).filter(Wallet.owner_id == owner_id).first()
         return self._model_to_domain(wallet_model) if wallet_model else None
 
-    def get_by_id(self, wallet_id: UUID) -> Optional[Wallet]:
-        wallet_model = self.db.query(WalletModel).filter(WalletModel.id == wallet_id).first()
+    def get_by_id(self, wallet_id: UUID) -> Optional[DomainWallet]:
+        wallet_model = self.db.query(Wallet).filter(Wallet.id == wallet_id).first()
         return self._model_to_domain(wallet_model) if wallet_model else None
 
     def update_balance(self, wallet_id: UUID, new_balance: Decimal) -> None:
-        wallet_model = self.db.query(WalletModel).filter(WalletModel.id == wallet_id).first()
+        wallet_model = self.db.query(Wallet).filter(Wallet.id == wallet_id).first()
         if wallet_model:
             wallet_model.balance = new_balance
             self.db.commit()
 
-    def add_transaction(self, transaction: Transaction) -> None:
+    def add_transaction(self, transaction: DomainTransaction) -> None:
         transaction_type = (
             TransactionType.TOP_UP 
             if isinstance(transaction, TopUpTransaction) 
             else TransactionType.SPEND
         )
-        transaction_model = TransactionModel(
+        transaction_model = Transaction(
             wallet_id=transaction.wallet_id,
             type=transaction_type,
             amount=transaction.amount,
@@ -126,18 +126,18 @@ class WalletRepository:
         self.db.add(transaction_model)
         self.db.commit()
 
-    def _model_to_domain(self, wallet_model: WalletModel) -> Optional[Wallet]:
+    def _model_to_domain(self, wallet_model: Wallet) -> Optional[DomainWallet]:
         if not wallet_model:
             return None
             
-        wallet = Wallet(
+        wallet = DomainWallet(
             id=wallet_model.id,
             owner_id=wallet_model.owner_id,
             balance=wallet_model.balance
         )
         
-        transaction_models = self.db.query(TransactionModel).filter(
-            TransactionModel.wallet_id == wallet_model.id
+        transaction_models = self.db.query(Transaction).filter(
+            Transaction.wallet_id == wallet_model.id
         ).all()
         
         for txn_model in transaction_models:
@@ -168,7 +168,7 @@ class TaskRepository:
         self.db = db
 
     def create_task(self, task: RecognitionTask) -> RecognitionTask:
-        task_model = TaskModel(
+        task_model = Task(
             id=task.id,
             user_id=task._user_id,
             file_id=task._file.path,
@@ -181,11 +181,11 @@ class TaskRepository:
         return task
 
     def get_by_id(self, task_id: UUID) -> Optional[RecognitionTask]:
-        task_model = self.db.query(TaskModel).filter(TaskModel.id == task_id).first()
+        task_model = self.db.query(Task).filter(Task.id == task_id).first()
         return self._model_to_domain(task_model) if task_model else None
 
     def get_by_user_id(self, user_id: UUID) -> List[RecognitionTask]:
-        task_models = self.db.query(TaskModel).filter(TaskModel.user_id == user_id).all()
+        task_models = self.db.query(Task).filter(Task.user_id == user_id).all()
         return [self._model_to_domain(model) for model in task_models]
 
     def update_task_status(
@@ -195,7 +195,7 @@ class TaskRepository:
         output: Optional[str] = None, 
         error: Optional[str] = None
     ) -> None:
-        task_model = self.db.query(TaskModel).filter(TaskModel.id == task_id).first()
+        task_model = self.db.query(Task).filter(Task.id == task_id).first()
         if task_model:
             task_model.status = TaskStatus(status)
             if output:
@@ -204,7 +204,7 @@ class TaskRepository:
                 task_model.error_message = error
             self.db.commit()
 
-    def _model_to_domain(self, task_model: TaskModel) -> Optional[RecognitionTask]:
+    def _model_to_domain(self, task_model: Task) -> Optional[RecognitionTask]:
         return None
 
 class MLModelRepository:
@@ -213,8 +213,8 @@ class MLModelRepository:
     def __init__(self, db: Session) -> None:
         self.db = db
 
-    def create_model(self, name: str, credit_cost: Decimal) -> MLModel:
-        model_instance = MLModelModel(
+    def create_model(self, name: str, credit_cost: Decimal) -> DomainMLModel:
+        model_instance = MLModel(
             name=name,
             credit_cost=credit_cost
         )
@@ -222,17 +222,17 @@ class MLModelRepository:
         self.db.commit()
         return self._model_to_domain(model_instance)
 
-    def get_by_id(self, model_id: UUID) -> Optional[MLModel]:
-        model_instance = self.db.query(MLModelModel).filter(MLModelModel.id == model_id).first()
+    def get_by_id(self, model_id: UUID) -> Optional[DomainMLModel]:
+        model_instance = self.db.query(MLModel).filter(MLModel.id == model_id).first()
         return self._model_to_domain(model_instance) if model_instance else None
 
-    def get_active_models(self) -> List[MLModel]:
-        model_instances = self.db.query(MLModelModel).filter(MLModelModel.is_active == 1).all()
+    def get_active_models(self) -> List[DomainMLModel]:
+        model_instances = self.db.query(MLModel).filter(MLModel.is_active == 1).all()
         return [self._model_to_domain(model) for model in model_instances]
 
-    def _model_to_domain(self, model_instance: MLModelModel) -> MLModel:
-        class DemoMLModel(MLModel):
-            def preprocess(self, file: File):
+    def _model_to_domain(self, model_instance: MLModel) -> DomainMLModel:
+        class DemoMLModel(DomainMLModel):
+            def preprocess(self, file: DomainFile):
                 return "preprocessed_data"
             
             def predict(self, data):
@@ -256,8 +256,8 @@ class FileRepository:
         content_type: str, 
         original_filename: str = None, 
         size: int = None
-    ) -> File:
-        file_model = FileModel(
+    ) -> DomainFile:
+        file_model = File(
             path=path,
             content_type=content_type,
             original_filename=original_filename,
@@ -266,8 +266,8 @@ class FileRepository:
         self.db.add(file_model)
         self.db.commit()
         
-        return File(path=file_model.path, content_type=file_model.content_type)
+        return DomainFile(path=file_model.path, content_type=file_model.content_type)
 
-    def get_by_id(self, file_id: UUID) -> Optional[File]:
-        file_model = self.db.query(FileModel).filter(FileModel.id == file_id).first()
-        return File(path=file_model.path, content_type=file_model.content_type) if file_model else None
+    def get_by_id(self, file_id: UUID) -> Optional[DomainFile]:
+        file_model = self.db.query(File).filter(File.id == file_id).first()
+        return DomainFile(path=file_model.path, content_type=file_model.content_type) if file_model else None

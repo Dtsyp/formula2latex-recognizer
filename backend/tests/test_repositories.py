@@ -63,11 +63,11 @@ class TestUserRepository:
         user = repo.create_user("test@example.com", "password123")
         
         # Get the actual hashed password from DB to test verification
-        from infrastructure.models import UserModel
+        from infrastructure.models import User as UserModel
         user_model = test_db.query(UserModel).filter(UserModel.email == "test@example.com").first()
         
-        assert repo.verify_password("password123", user_model.password_hash) is True
-        assert repo.verify_password("wrongpassword", user_model.password_hash) is False
+        assert repo.verify_password("password123", user_model.password) is True
+        assert repo.verify_password("wrongpassword", user_model.password) is False
 
 
 class TestWalletRepository:

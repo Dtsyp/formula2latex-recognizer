@@ -70,24 +70,24 @@ def test_sqlalchemy_models():
     
     try:
         from infrastructure.models import (
-            UserModel, WalletModel, TransactionModel, 
-            MLModelModel, FileModel, TaskModel,
+            User, Wallet, Transaction, 
+            MLModel, File, Task,
             UserRole, TaskStatus, TransactionType
         )
         
         # Создаем объекты моделей (без сохранения в БД)
-        user_model = UserModel(
+        user_model = User(
             email="test@example.com",
-            password_hash="hash123",
+            password="hash123",
             role=UserRole.USER
         )
         
-        wallet_model = WalletModel(
+        wallet_model = Wallet(
             owner_id=user_model.id,
             balance=Decimal("100.00")
         )
         
-        model_model = MLModelModel(
+        model_model = MLModel(
             name="TestModel",
             credit_cost=Decimal("5.00")
         )
