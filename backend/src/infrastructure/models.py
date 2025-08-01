@@ -22,6 +22,7 @@ class TransactionType(enum.Enum):
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email = Column(String(255), unique=True, nullable=False)
@@ -35,6 +36,7 @@ class User(Base):
 
 class Wallet(Base):
     __tablename__ = "wallets"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     owner_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
@@ -47,6 +49,7 @@ class Wallet(Base):
 
 class Transaction(Base):
     __tablename__ = "transactions"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     wallet_id = Column(UUID(as_uuid=True), ForeignKey("wallets.id"), nullable=False)
@@ -59,6 +62,7 @@ class Transaction(Base):
 
 class MLModel(Base):
     __tablename__ = "ml_models"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(255), nullable=False)
@@ -71,6 +75,7 @@ class MLModel(Base):
 
 class File(Base):
     __tablename__ = "files"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     path = Column(String(500), nullable=False)
@@ -83,6 +88,7 @@ class File(Base):
 
 class Task(Base):
     __tablename__ = "tasks"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)

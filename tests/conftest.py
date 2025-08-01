@@ -6,8 +6,9 @@ from sqlalchemy.orm import sessionmaker
 import pytest
 import pytest_postgresql
 
-# Добавляем src в Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+# Добавляем backend/src в Python path
+backend_src_path = os.path.join(os.path.dirname(__file__), '..', 'backend', 'src')
+sys.path.insert(0, backend_src_path)
 
 from infrastructure.database import Base
 import infrastructure.models
@@ -35,3 +36,18 @@ def test_db(postgresql):
         session.close()
         # Clean up
         Base.metadata.drop_all(engine)
+
+@pytest.fixture
+def mock_rabbitmq():
+    """Mock RabbitMQ для тестов"""
+    class MockRabbitMQ:
+        def __init__(self):
+            self.messages = []
+        
+        def publish(self, message):
+            self.messages.append(message)
+        
+        def get_messages(self):
+            return self.messages
+    
+    return MockRabbitMQ()

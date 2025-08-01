@@ -5,11 +5,14 @@ services:
       dockerfile: src/Dockerfile
     env_file:
       - .env
+    ports:
+      - "8000:8000"
     volumes:
       - ./src:/app/src
     depends_on:
       - database
       - rabbitmq
+      - db-init
 
   telegram-bot:
     build:
@@ -28,15 +31,16 @@ services:
       - database
     restart: unless-stopped
 
-  web-proxy:
-    image: nginx:1.25.3
+  # Frontend
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
     depends_on:
       - app
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    restart: unless-stopped
 
   rabbitmq:
     image: rabbitmq:3.12-management
@@ -46,6 +50,80 @@ services:
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
     restart: on-failure
+
+  # ML Workers
+  ml-worker-1:
+    build:
+      context: ../ml
+      dockerfile: Dockerfile
+    command: python worker.py --worker-id worker-1
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USERNAME=guest
+      - RABBITMQ_PASSWORD=guest
+    depends_on:
+      - rabbitmq
+    restart: unless-stopped
+
+  ml-worker-2:
+    build:
+      context: ../ml
+      dockerfile: Dockerfile
+    command: python worker.py --worker-id worker-2
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USERNAME=guest
+      - RABBITMQ_PASSWORD=guest
+    depends_on:
+      - rabbitmq
+    restart: unless-stopped
+
+  ml-worker-3:
+    build:
+      context: ../ml
+      dockerfile: Dockerfile
+    command: python worker.py --worker-id worker-3
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USERNAME=guest
+      - RABBITMQ_PASSWORD=guest
+    depends_on:
+      - rabbitmq
+    restart: unless-stopped
+
+  # Database Initialization
+  db-init:
+    build:
+      context: .
+      dockerfile: src/Dockerfile
+    command: python src/infrastructure/init_db.py
+    env_file:
+      - .env
+    depends_on:
+      - database
+    restart: "no"
+
+  # Result Processor
+  result-processor:
+    build:
+      context: .
+      dockerfile: src/Dockerfile
+    command: python src/services/result_processor.py
+    env_file:
+      - .env
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USERNAME=guest
+      - RABBITMQ_PASSWORD=guest
+    depends_on:
+      - database
+      - rabbitmq
+      - db-init
+    restart: unless-stopped
 
   database:
     image: postgres:16.1

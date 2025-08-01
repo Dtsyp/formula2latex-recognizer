@@ -6,10 +6,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL", 
-    "postgresql://user:password@localhost:5432/formula2latex"
-)
+def get_database_url():
+    """Получение URL базы данных"""
+    return os.getenv(
+        "DATABASE_URL", 
+        "postgresql://user:password@localhost:5432/formula2latex"
+    )
+
+DATABASE_URL = get_database_url()
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

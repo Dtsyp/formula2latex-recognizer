@@ -171,7 +171,7 @@ class TaskRepository:
         task_model = Task(
             id=task.id,
             user_id=task._user_id,
-            file_id=task._file.path,
+            file_id=task._file.id,  # Используем UUID вместо path
             model_id=task._model.id,
             status=TaskStatus.PENDING,
             credits_charged=task.credits_charged
