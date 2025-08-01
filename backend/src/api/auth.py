@@ -4,8 +4,8 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from infrastructure.database import get_db
-from infrastructure.repositories import UserRepository
+from api.dependencies import get_user_repository
+from domain.interfaces.repositories import UserRepositoryInterface
 from domain.user import User
 import os
 
@@ -34,7 +34,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    db = Depends(get_db)
+    user_repo: UserRepositoryInterface = Depends(get_user_repository)
 ) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -51,7 +51,6 @@ async def get_current_user(
         raise credentials_exception
     
     from uuid import UUID
-    user_repo = UserRepository(db)
     user = user_repo.get_by_id(UUID(user_id))
     if user is None:
         raise credentials_exception

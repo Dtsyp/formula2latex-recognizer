@@ -1,10 +1,10 @@
 """Infrastructure layer for formula2latex backend."""
 
 from .repositories import (
-    UserRepository,
-    WalletRepository,
-    TaskRepository,
-    MLModelRepository,
+    SQLAlchemyUserRepository,
+    SQLAlchemyWalletRepository,
+    SQLAlchemyTaskRepository,
+    SQLAlchemyMLModelRepository,
     FileRepository,
 )
 from .database import Base, get_db, SessionLocal
@@ -22,10 +22,10 @@ from .models import (
 
 __all__ = [
     # Repositories
-    "UserRepository",
-    "WalletRepository", 
-    "TaskRepository",
-    "MLModelRepository",
+    "SQLAlchemyUserRepository",
+    "SQLAlchemyWalletRepository", 
+    "SQLAlchemyTaskRepository",
+    "SQLAlchemyMLModelRepository",
     "FileRepository",
     # Database
     "Base",

@@ -12,6 +12,8 @@ import pika
 from datetime import datetime
 import uuid
 
+from domain.interfaces.services import MessagingServiceInterface
+
 logger = logging.getLogger(__name__)
 
 
@@ -217,8 +219,37 @@ class BackendMessaging:
 _messaging_instance: Optional[BackendMessaging] = None
 
 
+class RabbitMQMessagingService(MessagingServiceInterface):
+    
+    def __init__(self):
+        self._backend_messaging = BackendMessaging()
+    
+    def send_task(self, task_data: Dict[str, Any]) -> bool:
+        try:
+            task_id = self._backend_messaging.publish_task(task_data)
+            return task_id is not None
+        except Exception as e:
+            logger.error(f"Ошибка отправки задачи: {e}")
+            return False
+    
+    def receive_result(self, task_id: str) -> Dict[str, Any]:
+        try:
+            result = self._backend_messaging.get_task_result(task_id)
+            return result if result is not None else {"task_id": task_id, "status": "pending"}
+        except Exception as e:
+            logger.error(f"Ошибка получения результата: {e}")
+            return {"error": str(e)}
+    
+    def publish_notification(self, user_id: str, message: str) -> bool:
+        try:
+            logger.info(f"Отправка уведомления пользователю {user_id}: {message}")
+            return True
+        except Exception as e:
+            logger.error(f"Ошибка отправки уведомления: {e}")
+            return False
+
+
 def get_messaging() -> BackendMessaging:
-    """Получение экземпляра мессенджера"""
     global _messaging_instance
     if _messaging_instance is None:
         _messaging_instance = BackendMessaging()

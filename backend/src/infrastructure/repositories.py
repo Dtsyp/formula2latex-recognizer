@@ -2,9 +2,14 @@ from decimal import Decimal
 from typing import List, Optional
 from uuid import UUID
 
-from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
+from domain.interfaces.repositories import (
+    UserRepositoryInterface,
+    WalletRepositoryInterface, 
+    TaskRepositoryInterface,
+    MLModelRepositoryInterface
+)
 from domain.file import File as DomainFile
 from domain.model import MLModel as DomainMLModel
 from domain.task import RecognitionTask
@@ -22,17 +27,12 @@ from infrastructure.models import (
     Wallet,
 )
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-class UserRepository:
-    """Репозиторий для работы с пользователями."""
+class SQLAlchemyUserRepository(UserRepositoryInterface):
 
     def __init__(self, db: Session) -> None:
         self.db = db
 
-    def create_user(self, email: str, password: str, role: str = "user") -> DomainUser:
-        password_hash = pwd_context.hash(password)
-        
+    def create_user(self, email: str, password_hash: str, role: str = "user") -> DomainUser:
         user_model = User(
             email=email,
             password=password_hash,
@@ -55,44 +55,50 @@ class UserRepository:
         user_model = self.db.query(User).filter(User.email == email).first()
         return self._model_to_domain(user_model) if user_model else None
 
-    def get_all(self) -> List[DomainUser]:
-        user_models = self.db.query(User).all()
-        return [self._model_to_domain(model) for model in user_models]
-
     def update_user(self, user: DomainUser) -> DomainUser:
         user_model = self.db.query(User).filter(User.id == user.id).first()
-        if user_model:
-            user_model.email = user.email
-            self.db.commit()
+        if not user_model:
+            raise ValueError(f"User with id {user.id} not found")
+            
+        user_model.email = user.email
+        user_model.password = user.password_hash
+        user_model.role = UserRole.ADMIN if user.role == "admin" else UserRole.USER
+        user_model.is_active = user.is_active
+        self.db.commit()
+        
         return self._model_to_domain(user_model)
-
-    def verify_password(self, plain_password: str, hashed_password: str) -> bool:
-        return pwd_context.verify(plain_password, hashed_password)
+    
+    def delete_user(self, user_id: UUID) -> bool:
+        user_model = self.db.query(User).filter(User.id == user_id).first()
+        if not user_model:
+            return False
+            
+        self.db.delete(user_model)
+        self.db.commit()
+        return True
 
     def _model_to_domain(self, user_model: User) -> Optional[DomainUser]:
         if not user_model:
             return None
             
-        wallet_repo = WalletRepository(self.db)
-        wallet = wallet_repo.get_by_owner_id(user_model.id)
-        
         if user_model.role == UserRole.ADMIN:
             return Admin(
                 id=user_model.id,
                 email=user_model.email,
                 password_hash=user_model.password,
-                wallet=wallet
+                role="admin",
+                is_active=user_model.is_active
             )
         else:
             return DomainUser(
                 id=user_model.id,
                 email=user_model.email,
                 password_hash=user_model.password,
-                wallet=wallet
+                role="user",
+                is_active=user_model.is_active
             )
 
-class WalletRepository:
-    """Репозиторий для работы с кошельками."""
+class SQLAlchemyWalletRepository(WalletRepositoryInterface):
 
     def __init__(self, db: Session) -> None:
         self.db = db
@@ -101,17 +107,27 @@ class WalletRepository:
         wallet_model = self.db.query(Wallet).filter(Wallet.owner_id == owner_id).first()
         return self._model_to_domain(wallet_model) if wallet_model else None
 
-    def get_by_id(self, wallet_id: UUID) -> Optional[DomainWallet]:
+    def create_wallet(self, owner_id: UUID, initial_balance: Decimal = Decimal("0")) -> DomainWallet:
+        wallet_model = Wallet(
+            owner_id=owner_id,
+            balance=initial_balance
+        )
+        self.db.add(wallet_model)
+        self.db.commit()
+        
+        return self._model_to_domain(wallet_model)
+    
+    def update_balance(self, wallet_id: UUID, new_balance: Decimal) -> DomainWallet:
         wallet_model = self.db.query(Wallet).filter(Wallet.id == wallet_id).first()
-        return self._model_to_domain(wallet_model) if wallet_model else None
+        if not wallet_model:
+            raise ValueError(f"Wallet with id {wallet_id} not found")
+            
+        wallet_model.balance = new_balance
+        self.db.commit()
+        
+        return self._model_to_domain(wallet_model)
 
-    def update_balance(self, wallet_id: UUID, new_balance: Decimal) -> None:
-        wallet_model = self.db.query(Wallet).filter(Wallet.id == wallet_id).first()
-        if wallet_model:
-            wallet_model.balance = new_balance
-            self.db.commit()
-
-    def add_transaction(self, transaction: DomainTransaction) -> None:
+    def add_transaction(self, transaction: DomainTransaction) -> DomainTransaction:
         transaction_type = (
             TransactionType.TOP_UP 
             if isinstance(transaction, TopUpTransaction) 
@@ -125,6 +141,35 @@ class WalletRepository:
         )
         self.db.add(transaction_model)
         self.db.commit()
+        
+        return transaction
+    
+    def get_transactions(self, wallet_id: UUID, limit: int = 100) -> List[DomainTransaction]:
+        transaction_models = self.db.query(Transaction).filter(
+            Transaction.wallet_id == wallet_id
+        ).order_by(Transaction.created_at.desc()).limit(limit).all()
+        
+        transactions = []
+        for txn_model in transaction_models:
+            if txn_model.type == TransactionType.TOP_UP:
+                txn = TopUpTransaction(
+                    id=txn_model.id,
+                    wallet_id=txn_model.wallet_id,
+                    amount=txn_model.amount,
+                    timestamp=txn_model.created_at,
+                    post_balance=txn_model.post_balance
+                )
+            else:
+                txn = SpendTransaction(
+                    id=txn_model.id,
+                    wallet_id=txn_model.wallet_id,
+                    amount=txn_model.amount,
+                    timestamp=txn_model.created_at,
+                    post_balance=txn_model.post_balance
+                )
+            transactions.append(txn)
+        
+        return transactions
 
     def _model_to_domain(self, wallet_model: Wallet) -> Optional[DomainWallet]:
         if not wallet_model:
@@ -161,8 +206,7 @@ class WalletRepository:
         
         return wallet
 
-class TaskRepository:
-    """Репозиторий для работы с задачами."""
+class SQLAlchemyTaskRepository(TaskRepositoryInterface):
 
     def __init__(self, db: Session) -> None:
         self.db = db
@@ -192,31 +236,42 @@ class TaskRepository:
         self, 
         task_id: UUID, 
         status: str, 
-        output: Optional[str] = None, 
-        error: Optional[str] = None
-    ) -> None:
+        output: str = None, 
+        error: str = None
+    ) -> RecognitionTask:
         task_model = self.db.query(Task).filter(Task.id == task_id).first()
-        if task_model:
-            task_model.status = TaskStatus(status)
-            if output:
-                task_model.output_data = output
-            if error:
-                task_model.error_message = error
-            self.db.commit()
+        if not task_model:
+            raise ValueError(f"Task with id {task_id} not found")
+            
+        task_model.status = TaskStatus(status)
+        if output:
+            task_model.output_data = output
+        if error:
+            task_model.error_message = error
+        self.db.commit()
+        
+        return self._model_to_domain(task_model)
+    
+    def get_pending_tasks(self, limit: int = 100) -> List[RecognitionTask]:
+        task_models = self.db.query(Task).filter(
+            Task.status == TaskStatus.PENDING
+        ).limit(limit).all()
+        
+        return [self._model_to_domain(model) for model in task_models if model]
 
     def _model_to_domain(self, task_model: Task) -> Optional[RecognitionTask]:
         return None
 
-class MLModelRepository:
-    """Репозиторий для работы с ML моделями."""
+class SQLAlchemyMLModelRepository(MLModelRepositoryInterface):
 
     def __init__(self, db: Session) -> None:
         self.db = db
 
-    def create_model(self, name: str, credit_cost: Decimal) -> DomainMLModel:
+    def create_model(self, name: str, credit_cost: Decimal, is_active: bool = True) -> DomainMLModel:
         model_instance = MLModel(
             name=name,
-            credit_cost=credit_cost
+            credit_cost=credit_cost,
+            is_active=is_active
         )
         self.db.add(model_instance)
         self.db.commit()
@@ -226,9 +281,29 @@ class MLModelRepository:
         model_instance = self.db.query(MLModel).filter(MLModel.id == model_id).first()
         return self._model_to_domain(model_instance) if model_instance else None
 
-    def get_active_models(self) -> List[DomainMLModel]:
-        model_instances = self.db.query(MLModel).filter(MLModel.is_active == 1).all()
+    def get_all_active(self) -> List[DomainMLModel]:
+        model_instances = self.db.query(MLModel).filter(MLModel.is_active == True).all()
         return [self._model_to_domain(model) for model in model_instances]
+    
+    def update_model(self, model: DomainMLModel) -> DomainMLModel:
+        model_instance = self.db.query(MLModel).filter(MLModel.id == model.id).first()
+        if not model_instance:
+            raise ValueError(f"Model with id {model.id} not found")
+            
+        model_instance.name = model.name
+        model_instance.credit_cost = model.credit_cost
+        self.db.commit()
+        
+        return self._model_to_domain(model_instance)
+    
+    def deactivate_model(self, model_id: UUID) -> bool:
+        model_instance = self.db.query(MLModel).filter(MLModel.id == model_id).first()
+        if not model_instance:
+            return False
+            
+        model_instance.is_active = False
+        self.db.commit()
+        return True
 
     def _model_to_domain(self, model_instance: MLModel) -> DomainMLModel:
         class DemoMLModel(DomainMLModel):
@@ -245,7 +320,6 @@ class MLModelRepository:
         )
 
 class FileRepository:
-    """Репозиторий для работы с файлами."""
 
     def __init__(self, db: Session) -> None:
         self.db = db

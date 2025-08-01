@@ -608,29 +608,58 @@ class BotHandlers:
         try:
             # Отправляем на распознавание
             token = self.user_storage.get_jwt_token(user_id)
+            # Создаем задачу
             task = await self.api_client.predict(token, model_id, bytes(file_content), filename)
             
             if task:
-                if task.status == "done" and task.output_data:
+                # Уведомляем о создании задачи
+                await update.message.reply_text(
+                    f"⏳ Задача создана! ID: `{task.id}`\n"
+                    f"💰 Списано кредитов: {task.credits_charged}\n"
+                    f"🔄 Обрабатывается...", 
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                
+                # Ждем результат из очереди RabbitMQ (до 60 секунд)
+                result = await self.api_client.get_task_result(token, str(task.id), timeout=60)
+                
+                if result and result.get('success'):
+                    # Успешный результат
+                    latex_code = result.get('latex_code', 'Код не найден')
+                    confidence = result.get('confidence', 0)
                     result_text = f"""
 ✅ *Распознавание завершено!*
 
 📸 Загруженное изображение обработано
 💰 Списано кредитов: `{task.credits_charged}`
+🎯 Уверенность: {confidence:.2%}
 
 🔤 *LaTeX код:*
 ```latex
-{task.output_data}
+{latex_code}
 ```
 
 🆔 ID задачи: `{task.id}`
 """
-                else:
+                elif result and not result.get('success'):
+                    # Ошибка из результата
+                    error_msg = result.get('error', 'Неизвестная ошибка')
                     result_text = f"""
 ❌ *Ошибка распознавания*
 
 💰 Списано кредитов: `{task.credits_charged}`
-📝 Ошибка: {task.error_message or "Неизвестная ошибка"}
+📝 Ошибка: {error_msg}
+
+🆔 ID задачи: `{task.id}`
+"""
+                else:
+                    # Таймаут - результат не готов
+                    result_text = f"""
+⏰ *Обработка занимает больше времени*
+
+💰 Списано кредитов: `{task.credits_charged}`
+🔄 Задача все еще обрабатывается
+📋 Проверьте результат позже через /history
 
 🆔 ID задачи: `{task.id}`
 """
@@ -699,29 +728,60 @@ class BotHandlers:
         try:
             # Отправляем на распознавание
             token = self.user_storage.get_jwt_token(user_id)
+            # Создаем задачу
             task = await self.api_client.predict(token, model_id, bytes(file_content), document.file_name)
             
             if task:
-                if task.status == "done" and task.output_data:
+                # Уведомляем о создании задачи
+                await processing_msg.edit_text(
+                    f"⏳ Задача создана! ID: `{task.id}`\n"
+                    f"💰 Списано кредитов: {task.credits_charged}\n"
+                    f"🔄 Обрабатывается...", 
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                
+                # Ждем результат из очереди RabbitMQ (до 60 секунд)
+                result = await self.api_client.get_task_result(token, str(task.id), timeout=60)
+                
+                if result and result.get('success'):
+                    # Успешный результат
+                    latex_code = result.get('latex_code', 'Код не найден')
+                    confidence = result.get('confidence', 0)
                     result_text = f"""
 ✅ *Распознавание завершено!*
 
 📁 Файл: `{document.file_name}`
 💰 Списано кредитов: `{task.credits_charged}`
+🎯 Уверенность: {confidence:.2%}
 
 🔤 *LaTeX код:*
 ```latex
-{task.output_data}
+{latex_code}
 ```
 
 🆔 ID задачи: `{task.id}`
 """
-                else:
+                elif result and not result.get('success'):
+                    # Ошибка из результата
+                    error_msg = result.get('error', 'Неизвестная ошибка')
                     result_text = f"""
 ❌ *Ошибка распознавания*
 
+📁 Файл: `{document.file_name}`
 💰 Списано кредитов: `{task.credits_charged}`
-📝 Ошибка: {task.error_message or "Неизвестная ошибка"}
+📝 Ошибка: {error_msg}
+
+🆔 ID задачи: `{task.id}`
+"""
+                else:
+                    # Таймаут - результат не готов
+                    result_text = f"""
+⏰ *Обработка занимает больше времени*
+
+📁 Файл: `{document.file_name}`
+💰 Списано кредитов: `{task.credits_charged}`
+🔄 Задача все еще обрабатывается
+📋 Проверьте результат позже через /history
 
 🆔 ID задачи: `{task.id}`
 """

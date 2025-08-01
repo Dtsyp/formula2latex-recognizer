@@ -1,144 +1,42 @@
-from decimal import Decimal
-from typing import List
-from uuid import UUID, uuid4
+from dataclasses import dataclass
+from uuid import UUID
+from typing import Optional
 
-from domain.file import File
-from domain.model import MLModel
-from domain.task import RecognitionTask
-from domain.wallet import Wallet, Transaction, TopUpTransaction
 
+@dataclass(frozen=True)
 class User:
-    """Пользователь системы."""
-
-    def __init__(
-        self,
-        id: UUID,
-        email: str,
-        password_hash: str,
-        wallet: Wallet
-    ):
-        self._id = id
-        self._email = email
-        self._password_hash = password_hash
-        self._wallet = wallet
-        self._tasks: List[RecognitionTask] = []
-
-    @property
-    def id(self) -> UUID:
-        return self._id
-
-    @property
-    def email(self) -> str:
-        return self._email
-
-    @property
-    def wallet(self) -> Wallet:
-        return self._wallet
-
-    @property
-    def tasks(self) -> List[RecognitionTask]:
-        return list(self._tasks)
-
-    @property
-    def password_hash(self) -> str:
-        return self._password_hash
-
+    id: UUID
+    email: str
+    password_hash: str
+    role: str = "user"
+    is_active: bool = True
+    
+    def __post_init__(self):
+        self._validate_email(self.email)
+        self._validate_role(self.role)
+    
+    def is_admin(self) -> bool:
+        return self.role == "admin"
+    
+    def is_regular_user(self) -> bool:
+        return self.role == "user"
+    
+    def has_role(self, role: str) -> bool:
+        return self.role == role
+    
     def _validate_email(self, email: str) -> None:
         if "@" not in email or len(email) < 5:
             raise ValueError("Некорректный email")
+    
+    def _validate_role(self, role: str) -> None:
+        allowed_roles = ["user", "admin"]
+        if role not in allowed_roles:
+            raise ValueError(f"Недопустимая роль: {role}. Разрешены: {allowed_roles}")
 
-    def _validate_password(self, password: str) -> None:
-        if len(password) < 8:
-            raise ValueError("Пароль должен быть не менее 8 символов")
 
-    def get_tasks(self) -> List[RecognitionTask]:
-        return self.tasks
-
-    def execute_task(self, file: File, model: MLModel) -> RecognitionTask:
-        """Создает задачу RecognitionTask, выполняет её и сохраняет в историю."""
-        task = RecognitionTask(
-            id=uuid4(),
-            user_id=self._id,
-            file=file,
-            model=model
-        )
-
-        # Проверяем баланс перед выполнением
-        if self._wallet.balance < task.credits_charged:
-            raise RuntimeError("Недостаточно кредитов")
-
-        try:
-            task.execute()
-        except Exception as e:
-            # Если произошла ошибка во время выполнения, средства остаются на балансе
-            self._tasks.append(task)
-            raise
-        else:
-            # Списываем средства только при успешном выполнении
-            self._wallet.spend(task.credits_charged)
-            self._tasks.append(task)
-
-        return task
-
-    def change_email(self, next_email: str) -> bool:
-        """Сменить email, если новый валиден и отличается от старого."""
-        self._validate_email(next_email)
-        if next_email == self._email:
-            return False
-        self._email = next_email
-        return True
-
-    def change_password(self, prev_password: str, next_password: str) -> bool:
-        """Сменить пароль: проверяем корректность предыдущего,
-        валидируем новый и обновляем хэш.
-        """
-        if not self._check_password(prev_password):
-            return False
-
-        self._validate_password(next_password)
-        if prev_password == next_password:
-            return False
-
-        self._password_hash = self._hash_password(next_password)
-        return True
-    def _check_password(self, password: str) -> bool:
-        """Сравниваем hash(password) с self._password_hash."""
-        pass
-
-    def _hash_password(self, password: str) -> str:
-        """Возвращаем новый хэш."""
-        pass
-
+@dataclass(frozen=True)
 class Admin(User):
-    """Администратор системы."""
-
-    def __init__(
-        self,
-        id: UUID,
-        email: str,
-        password_hash: str,
-        wallet: Wallet
-    ):
-        super().__init__(id, email, password_hash, wallet)
-        self._role = "admin"
-
-    @property
-    def role(self) -> str:
-        return self._role
-
-    def top_up_user(self, user: User, amount: Decimal) -> TopUpTransaction:
-        """Админ может напрямую пополнить баланс любого пользователя."""
-        txn = user.wallet.top_up(amount)
-        return txn
-
-    def view_user_transactions(self, user: User) -> List[Transaction]:
-        """Посмотреть историю транзакций конкретного пользователя."""
-        return user.wallet.transactions
-
-    def view_all_transactions(self, users: List[User]) -> List[Transaction]:
-        """Составить общий список транзакций по списку пользователей."""
-        all_txns: List[Transaction] = []
-        for u in users:
-            all_txns.extend(u.wallet.transactions)
-
-        return all_txns
+    def __post_init__(self):
+        object.__setattr__(self, 'role', 'admin')
+        self._validate_email(self.email)
+        self._validate_role(self.role)

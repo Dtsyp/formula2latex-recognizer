@@ -181,6 +181,26 @@ class APIClient:
         except Exception:
             return None
     
+    async def get_task_result(self, token: str, task_id: str, timeout: int = 30) -> Optional[dict]:
+        """
+        Получение результата задачи напрямую из RabbitMQ очереди.
+        Используется для быстрого получения результатов без ожидания обновления в БД.
+        """
+        try:
+            headers = {"Authorization": f"Bearer {token}"}
+            response = await self.client.get(
+                f"{self.base_url}/tasks/{task_id}/result?timeout={timeout}", 
+                headers=headers
+            )
+            if response.status_code == 200:
+                return response.json()
+            elif response.status_code == 408:
+                # Таймаут - результат еще не готов
+                return None
+            return None
+        except Exception:
+            return None
+
     async def get_tasks(self, token: str) -> List[TaskData]:
         """Получение истории задач"""
         try:

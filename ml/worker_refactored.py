@@ -20,12 +20,13 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-class FormulaWorker:
+class WorkerOrchestrator:
     
     def __init__(self, worker_id: str):
         self.worker_id = worker_id
         self.running = True
         
+        # Dependencies будут инициализированы в initialize()
         self._rabbitmq_manager = None
         self._validator = None
         self._processor = None
@@ -44,9 +45,11 @@ class FormulaWorker:
         try:
             logger.info(f"Инициализация воркера {self.worker_id}")
             
+            # Инициализация dependencies через DI
             self._rabbitmq_manager = get_rabbitmq_manager()
             ml_model = get_model()
             
+            # Создание сервисов с инъекцией зависимостей
             self._validator = TaskValidationService(ml_model)
             self._processor = TaskProcessingService(ml_model)
             self._publisher = ResultPublishingService(self._rabbitmq_manager)
@@ -57,49 +60,51 @@ class FormulaWorker:
             logger.error(f"Ошибка инициализации воркера {self.worker_id}: {e}")
             raise
     
-    def process_task(self, delivery_tag: str, task_data: Dict[str, Any]) -> None:
-        task_id = task_data.get('task_id', 'unknown')
+    def handle_task(self, ch, method, properties, body) -> None:
+        delivery_tag = method.delivery_tag
         
         try:
-            logger.info(f"Обработка задачи {task_id} воркером {self.worker_id}")
+            import json
+            task_data = json.loads(body.decode('utf-8'))
+            task_id = task_data.get('task_id', 'unknown')
             
+            logger.info(f"Получена задача {task_id}")
+            
+            # 1. Валидация (делегирована в TaskValidationService)
             validation_result = self._validator.validate(task_data)
             if not validation_result['valid']:
                 self._publisher.publish_error(task_data, validation_result['error'])
                 self._rabbitmq_manager.ack_message(delivery_tag)
                 return
             
+            # 2. Обработка (делегирована в TaskProcessingService)
             result = self._processor.process(task_data)
+            
+            # 3. Публикация результата (делегирована в ResultPublishingService)
             self._publisher.publish_success(result)
+            
+            # 4. Подтверждение получения сообщения
             self._rabbitmq_manager.ack_message(delivery_tag)
             
         except Exception as e:
-            logger.error(f"Ошибка обработки задачи {task_id}: {e}")
+            logger.error(f"Критическая ошибка обработки задачи: {e}")
             try:
+                task_data = json.loads(body.decode('utf-8'))
                 self._publisher.publish_error(task_data, f"Критическая ошибка: {str(e)}")
             except:
                 pass
             self._rabbitmq_manager.ack_message(delivery_tag)
     
-    def handle_message(self, ch, method, properties, body) -> None:
-        try:
-            import json
-            task_data = json.loads(body.decode('utf-8'))
-            self.process_task(method.delivery_tag, task_data)
-        except Exception as e:
-            logger.error(f"Ошибка обработки сообщения: {e}")
-            self._rabbitmq_manager.ack_message(method.delivery_tag)
-    
     def start(self) -> None:
         if not all([self._rabbitmq_manager, self._validator, self._processor, self._publisher]):
-            raise RuntimeError("Воркер не инициализирован")
+            raise RuntimeError("Воркер не инициализирован. Вызовите initialize() сначала.")
         
         logger.info(f"Запуск воркера {self.worker_id}")
         
         try:
             self._rabbitmq_manager.channel.basic_consume(
                 queue=self._rabbitmq_manager.config.task_queue,
-                on_message_callback=self.handle_message
+                on_message_callback=self.handle_task
             )
             
             logger.info(f"Воркер {self.worker_id} ожидает задачи...")
@@ -128,7 +133,7 @@ def main():
     parser.add_argument('--worker-id', required=True, help='Уникальный ID воркера')
     args = parser.parse_args()
     
-    worker = FormulaWorker(args.worker_id)
+    worker = WorkerOrchestrator(args.worker_id)
     
     try:
         worker.initialize()

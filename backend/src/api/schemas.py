@@ -19,6 +19,8 @@ class Token(BaseModel):
 class UserResponse(BaseModel):
     id: UUID
     email: str
+    role: str = "user"
+    is_active: bool = True
     created_at: Optional[datetime] = None
     
     class Config:
