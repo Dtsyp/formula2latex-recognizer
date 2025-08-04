@@ -3,7 +3,6 @@ from decimal import Decimal
 from abc import ABC, abstractmethod
 import datetime
 
-# Базовый абстрактный класс транзакции
 class Transaction(ABC):
     def __init__(
             self,
@@ -15,9 +14,9 @@ class Transaction(ABC):
     ):
         self._id: UUID = id
         self._wallet_id: UUID = wallet_id
-        self._amount: Decimal = amount # Сумма: при списании < 0, при пополнении > 0
-        self._timestamp: datetime.datetime = timestamp # Дата транзакции
-        self._post_balance: Decimal = post_balance # Баланс после совершения транзакции
+        self._amount: Decimal = amount
+        self._timestamp: datetime.datetime = timestamp
+        self._post_balance: Decimal = post_balance
 
     @property
     def id(self) -> UUID:
@@ -41,14 +40,8 @@ class Transaction(ABC):
 
     @abstractmethod
     def apply(self, wallet: "Wallet") -> None:
-        """
-        Применить транзакцию к кошельку:
-        - для списания: проверка баланса и уменьшение
-        - для пополнения: увеличение
-        """
         pass
 
-# Конкретная транзакция пополнения
 class TopUpTransaction(Transaction):
     def apply(self, wallet: "Wallet") -> None:
         wallet._balance += self._amount

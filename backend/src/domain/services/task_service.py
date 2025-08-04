@@ -18,13 +18,6 @@ from domain.interfaces.ml_model import ImageValidatorInterface
 class TaskManagementService(TaskServiceInterface):
     """
     Доменный сервис для управления задачами распознавания.
-    
-    Инкапсулирует бизнес-логику работы с задачами, которая ранее
-    находилась в классе User (нарушение SRP).
-    
-    Следует принципам:
-    - Single Responsibility: только логика управления задачами
-    - Dependency Inversion: зависит от абстракций
     """
     
     def __init__(
@@ -50,12 +43,6 @@ class TaskManagementService(TaskServiceInterface):
     ) -> RecognitionTask:
         """
         Создать задачу распознавания формулы.
-        
-        Бизнес-правила:
-        - Пользователь должен быть активным
-        - Модель должна существовать и быть активной
-        - Изображение должно быть валидным
-        - У пользователя должно быть достаточно средств
         """
         # Проверяем что пользователь активен
         if not user.is_active:
@@ -143,11 +130,6 @@ class TaskManagementService(TaskServiceInterface):
     def cancel_task(self, user: User, task_id: UUID) -> bool:
         """
         Отменить задачу (если она еще не начата).
-        
-        Бизнес-правила:
-        - Задача должна принадлежать пользователю
-        - Задача должна быть в статусе "pending"
-        - При отмене возвращаются средства
         """
         task = self.get_task_by_id(user, task_id)
         if not task:

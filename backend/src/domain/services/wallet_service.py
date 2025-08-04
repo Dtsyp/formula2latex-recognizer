@@ -9,17 +9,6 @@ from domain.interfaces.services import WalletServiceInterface
 
 
 class WalletManagementService(WalletServiceInterface):
-    """
-    Доменный сервис для управления кошельками пользователей.
-    
-    Инкапсулирует бизнес-логику работы с кошельками, которая ранее
-    была разбросана по разным классам.
-    
-    Следует принципам:
-    - Single Responsibility: только логика управления кошельками
-    - Dependency Inversion: зависит от абстракций
-    """
-    
     def __init__(self, wallet_repo: WalletRepositoryInterface):
         self._wallet_repo = wallet_repo
     
@@ -40,11 +29,6 @@ class WalletManagementService(WalletServiceInterface):
     def top_up_wallet(self, user: User, amount: Decimal, description: str = "Пополнение") -> Transaction:
         """
         Пополнить кошелек пользователя.
-        
-        Бизнес-правила:
-        - Сумма должна быть положительной
-        - Создается транзакция пополнения
-        - Обновляется баланс кошелька
         """
         if amount <= 0:
             raise ValueError("Сумма пополнения должна быть положительной")
@@ -65,11 +49,6 @@ class WalletManagementService(WalletServiceInterface):
     def charge_for_task(self, user: User, amount: Decimal, task_id: UUID) -> Transaction:
         """
         Списать средства за выполнение задачи.
-        
-        Бизнес-правила:
-        - Должно быть достаточно средств на балансе
-        - Создается транзакция списания
-        - Обновляется баланс кошелька
         """
         if amount <= 0:
             raise ValueError("Сумма списания должна быть положительной")
@@ -121,10 +100,6 @@ class WalletManagementService(WalletServiceInterface):
     def admin_top_up_user(self, admin_user: User, target_user: User, amount: Decimal) -> Transaction:
         """
         Администратор пополняет баланс пользователя.
-        
-        Бизнес-правила:
-        - Операцию может выполнить только администратор
-        - Сумма должна быть положительной
         """
         if not admin_user.is_admin():
             raise ValueError("Только администратор может пополнять баланс других пользователей")
