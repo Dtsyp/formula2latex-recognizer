@@ -5,7 +5,6 @@ import base64
 import io
 from PIL import Image
 
-# Mock ML components
 with patch.dict('sys.modules', {
     'transformers': Mock(),
     'torch': Mock(),

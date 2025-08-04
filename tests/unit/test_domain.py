@@ -1,12 +1,10 @@
 from decimal import Decimal
 from uuid import uuid4
 import pytest
+import datetime
 
 from domain.user import User, Admin
-from domain.wallet import Wallet, Transaction, TransactionType
-from domain.model import MLModel
-from domain.file import File
-from domain.task import RecognitionTask
+from domain.wallet import Wallet, TopUpTransaction, SpendTransaction
 
 
 class TestUser:
@@ -15,28 +13,49 @@ class TestUser:
         user = User(
             id=uuid4(),
             email="test@example.com",
-            password="hashedpassword"
+            password_hash="hashedpassword123",
+            role="user",
+            is_active=True
         )
         
         assert user.email == "test@example.com"
-        assert user.password == "hashedpassword"
+        assert user.password_hash == "hashedpassword123"
         assert user.role == "user"
-        assert len(user.get_tasks()) == 0
+        assert user.is_active is True
 
-    def test_user_password_validation(self):
-        with pytest.raises(ValueError, match="Пароль должен быть не менее 8 символов"):
-            User(
-                id=uuid4(),
-                email="test@example.com",
-                password="short"
-            )
+    def test_user_is_admin(self):
+        admin_user = User(
+            id=uuid4(),
+            email="admin@example.com", 
+            password_hash="hashedpassword123",
+            role="admin"
+        )
+        
+        regular_user = User(
+            id=uuid4(),
+            email="user@example.com",
+            password_hash="hashedpassword123", 
+            role="user"
+        )
+        
+        assert admin_user.is_admin() is True
+        assert regular_user.is_admin() is False
 
     def test_user_email_validation(self):
         with pytest.raises(ValueError, match="Некорректный email"):
             User(
                 id=uuid4(),
                 email="invalid-email",
-                password="password123"
+                password_hash="hashedpassword123"
+            )
+
+    def test_user_role_validation(self):
+        with pytest.raises(ValueError, match="Недопустимая роль"):
+            User(
+                id=uuid4(),
+                email="test@example.com",
+                password_hash="hashedpassword123",
+                role="invalid_role"
             )
 
 
@@ -45,33 +64,13 @@ class TestAdmin:
     def test_create_admin(self):
         admin = Admin(
             id=uuid4(),
-            email="admin@example.com", 
-            password="password123"
+            email="admin@example.com",
+            password_hash="hashedpassword123"
         )
         
         assert admin.role == "admin"
+        assert admin.is_admin() is True
         assert isinstance(admin, User)
-
-    def test_admin_top_up_user(self):
-        admin = Admin(
-            id=uuid4(),
-            email="admin@example.com",
-            password="password123"
-        )
-        
-        user = User(
-            id=uuid4(),
-            email="user@example.com",
-            password="password123"
-        )
-        
-        user._wallet = Wallet(id=uuid4(), owner_id=user.id, balance=Decimal("0"))
-        
-        transaction = admin.top_up_user(user, Decimal("50.00"))
-        
-        assert transaction.amount == Decimal("50.00")
-        assert transaction.type == TransactionType.TOP_UP
-        assert user._wallet.balance == Decimal("50.00")
 
 
 class TestWallet:
@@ -86,32 +85,34 @@ class TestWallet:
         assert wallet.balance == Decimal("100.00")
         assert len(wallet.transactions) == 0
 
-    def test_wallet_top_up(self):
+    def test_wallet_add_transaction(self):
+        wallet_id = uuid4()
         wallet = Wallet(
-            id=uuid4(),
+            id=wallet_id,
             owner_id=uuid4(),
             balance=Decimal("0")
         )
         
         transaction = wallet.top_up(Decimal("50.00"))
         
-        assert wallet.balance == Decimal("50.00")
-        assert transaction.amount == Decimal("50.00")
-        assert transaction.type == TransactionType.TOP_UP
         assert len(wallet.transactions) == 1
+        assert wallet.transactions[0].amount == Decimal("50.00")
+        assert wallet.balance == Decimal("50.00")
 
-    def test_wallet_spend(self):
+    def test_wallet_transactions(self):
         wallet = Wallet(
             id=uuid4(),
             owner_id=uuid4(),
             balance=Decimal("100.00")
         )
         
-        transaction = wallet.spend(Decimal("25.00"))
-        
+        spend_transaction = wallet.spend(Decimal("25.00"))
         assert wallet.balance == Decimal("75.00")
-        assert transaction.amount == Decimal("25.00")
-        assert transaction.type == TransactionType.SPEND
+        assert spend_transaction.amount == Decimal("25.00")
+        
+        topup_transaction = wallet.top_up(Decimal("50.00"))
+        assert wallet.balance == Decimal("125.00")
+        assert topup_transaction.amount == Decimal("50.00")
 
     def test_wallet_insufficient_funds(self):
         wallet = Wallet(
@@ -124,80 +125,30 @@ class TestWallet:
             wallet.spend(Decimal("50.00"))
 
 
-class TestMLModel:
+class TestTransactions:
     
-    def test_create_model(self):
-        model = MLModel(
+    def test_create_topup_transaction(self):
+        transaction = TopUpTransaction(
             id=uuid4(),
-            name="Test Model",
-            credit_cost=Decimal("5.00")
+            wallet_id=uuid4(),
+            amount=Decimal("50.00"),
+            timestamp=datetime.datetime.utcnow(),
+            post_balance=Decimal("150.00")
         )
         
-        assert model.name == "Test Model"
-        assert model.credit_cost == Decimal("5.00")
-        assert model.is_active is True
+        assert transaction.amount == Decimal("50.00")
+        assert transaction.post_balance == Decimal("150.00")
+        assert isinstance(transaction, TopUpTransaction)
 
-
-class TestFile:
-    
-    def test_create_file(self):
-        file = File(
-            path="test.png",
-            content_type="image/png"
-        )
-        
-        assert file.path == "test.png"
-        assert file.content_type == "image/png"
-
-    def test_file_validation(self):
-        with pytest.raises(ValueError, match="Неподдерживаемый тип файла"):
-            File(
-                path="test.txt",
-                content_type="text/plain"
-            )
-
-
-class TestRecognitionTask:
-    
-    def test_create_task(self):
-        user_id = uuid4()
-        file = File("test.png", "image/png")
-        model = MLModel(
+    def test_create_spend_transaction(self):
+        transaction = SpendTransaction(
             id=uuid4(),
-            name="Test Model",
-            credit_cost=Decimal("2.50")
+            wallet_id=uuid4(),
+            amount=Decimal("25.00"),
+            timestamp=datetime.datetime.utcnow(),
+            post_balance=Decimal("75.00")
         )
         
-        task = RecognitionTask(
-            id=uuid4(),
-            user_id=user_id,
-            file=file,
-            model=model
-        )
-        
-        assert task.user_id == user_id
-        assert task.file == file
-        assert task.model == model
-        assert task.credits_charged == Decimal("2.50")
-        assert task.status == "pending"
-
-    def test_task_execution(self):
-        user_id = uuid4()
-        file = File("test.png", "image/png")
-        model = MLModel(
-            id=uuid4(),
-            name="Test Model", 
-            credit_cost=Decimal("2.50")
-        )
-        
-        task = RecognitionTask(
-            id=uuid4(),
-            user_id=user_id,
-            file=file,
-            model=model
-        )
-        
-        task.execute()
-        
-        assert task.status == "completed"
-        assert task.output == "x^2 + y^2 = r^2"
+        assert transaction.amount == Decimal("25.00")
+        assert transaction.post_balance == Decimal("75.00")
+        assert isinstance(transaction, SpendTransaction)

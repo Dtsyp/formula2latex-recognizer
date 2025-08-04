@@ -1,173 +1,215 @@
-#!/usr/bin/env python3
-import sys
-import os
+import pytest
 from decimal import Decimal
 from uuid import uuid4
 
-sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
+from domain.user import User
+from domain.services.user_service import UserAuthService
+from domain.services.wallet_service import WalletManagementService
+from infrastructure.repositories import (
+    SQLAlchemyUserRepository,
+    SQLAlchemyWalletRepository,
+    SQLAlchemyMLModelRepository
+)
+from infrastructure.services.password_service import BCryptPasswordService
 
-def test_domain_models():
-    print("🧪 Тестирование доменных моделей...")
-    
-    from domain.user import User, Admin
-    from domain.wallet import Wallet
-    from domain.file import File
-    from domain.model import MLModel
-    from domain.task import RecognitionTask
-    
-    class DemoMLModel(MLModel):
-        def preprocess(self, file):
-            return f"preprocessed_{file.path}"
-        
-        def predict(self, data):
-            return "\\sum_{i=1}^{n} x_i^2"
-    
-    try:
-        # Тест создания пользователя и кошелька
-        wallet = Wallet(uuid4(), uuid4(), Decimal("0"))
-        user = User(uuid4(), "test@example.com", "password_hash", wallet)
-        
-        print(f"✅ Пользователь создан: {user.email}")
-        print(f"✅ Баланс кошелька: {user.wallet.balance}")
-        
-        # Тест пополнения баланса
-        top_up_amount = Decimal("100.00")
-        txn = user.wallet.top_up(top_up_amount)
-        print(f"✅ Пополнение на {top_up_amount}: новый баланс {user.wallet.balance}")
-        
-        # Тест создания задачи
-        model = DemoMLModel(uuid4(), "TestModel", Decimal("5.00"))
-        file = File("/path/to/test.png", "image/png")
-        task = RecognitionTask(uuid4(), user.id, file, model)
-        
-        print(f"✅ Задача создана: {task.id}")
-        print(f"✅ Стоимость: {task.credits_charged}")
-        
-        # Тест выполнения задачи
-        user.execute_task(file, model)
-        print(f"✅ Задача выполнена, новый баланс: {user.wallet.balance}")
-        print(f"✅ Количество транзакций: {len(user.wallet.transactions)}")
-        print(f"✅ Количество задач в истории: {len(user.tasks)}")
-        
-        # Тест создания админа
-        admin_wallet = Wallet(uuid4(), uuid4(), Decimal("0"))
-        admin = Admin(uuid4(), "admin@example.com", "admin_hash", admin_wallet)
-        
-        # Админ пополняет баланс пользователя
-        admin_top_up = admin.top_up_user(user, Decimal("50.00"))
-        print(f"✅ Админ пополнил баланс пользователя на 50.00")
-        print(f"✅ Финальный баланс пользователя: {user.wallet.balance}")
-        
-        return True
-        
-    except Exception as e:
-        print(f"❌ Ошибка в доменных моделях: {e}")
-        return False
 
-def test_sqlalchemy_models():
-    """Тестируем SQLAlchemy модели"""
-    print("\n🧪 Тестирование SQLAlchemy моделей...")
+class TestSystemIntegration:
     
-    try:
-        from infrastructure.models import (
-            User, Wallet, Transaction, 
-            MLModel, File, Task,
-            UserRole, TaskStatus, TransactionType
-        )
+    def test_user_registration_and_wallet_creation_flow(self, test_db):
+        user_repo = SQLAlchemyUserRepository(test_db)
+        wallet_repo = SQLAlchemyWalletRepository(test_db)
+        password_service = BCryptPasswordService()
         
-        # Создаем объекты моделей (без сохранения в БД)
-        user_model = User(
-            email="test@example.com",
-            password="hash123",
-            role=UserRole.USER
-        )
+        user_service = UserAuthService(user_repo, wallet_repo, password_service)
         
-        wallet_model = Wallet(
-            owner_id=user_model.id,
-            balance=Decimal("100.00")
-        )
+        user = user_service.register_user("test@example.com", "StrongPassword123!")
         
-        model_model = MLModel(
-            name="TestModel",
-            credit_cost=Decimal("5.00")
-        )
+        assert user.email == "test@example.com"
+        assert user.is_active is True
         
-        print("✅ SQLAlchemy модели созданы успешно")
-        print(f"✅ Пользователь: {user_model.email}")
-        print(f"✅ Роль: {user_model.role}")
-        print(f"✅ Баланс кошелька: {wallet_model.balance}")
-        print(f"✅ ML модель: {model_model.name}, стоимость: {model_model.credit_cost}")
-        
-        return True
-        
-    except Exception as e:
-        print(f"❌ Ошибка в SQLAlchemy моделях: {e}")
-        return False
+        wallet = wallet_repo.get_by_owner_id(user.id)
+        assert wallet is not None
+        assert wallet.owner_id == user.id
+        assert wallet.balance == Decimal("0")
 
-def test_imports():
-    """Тестируем импорты всех модулей"""
-    print("\n🧪 Тестирование импортов...")
-    
-    modules_to_test = [
-        'infrastructure.database',
-        'infrastructure.models',
-        'infrastructure.repositories',
-        'domain.user',
-        'domain.wallet',
-        'domain.task',
-        'domain.file',
-        'domain.model'
-    ]
-    
-    success_count = 0
-    for module in modules_to_test:
-        try:
-            __import__(module)
-            print(f"✅ {module}")
-            success_count += 1
-        except Exception as e:
-            print(f"❌ {module}: {e}")
-    
-    print(f"\n📊 Успешно импортировано: {success_count}/{len(modules_to_test)} модулей")
-    return success_count == len(modules_to_test)
+    def test_user_authentication_flow(self, test_db):
+        user_repo = SQLAlchemyUserRepository(test_db)
+        wallet_repo = SQLAlchemyWalletRepository(test_db)
+        password_service = BCryptPasswordService()
+        
+        user_service = UserAuthService(user_repo, wallet_repo, password_service)
+        
+        created_user = user_service.register_user("test@example.com", "StrongPassword123!")
+        
+        authenticated_user = user_service.authenticate_user("test@example.com", "StrongPassword123!")
+        assert authenticated_user is not None
+        assert authenticated_user.id == created_user.id
+        
+        failed_auth = user_service.authenticate_user("test@example.com", "WrongPassword")
+        assert failed_auth is None
 
-def main():
-    """Основная функция тестирования"""
-    print("🚀 Запуск тестирования системы formula2latex-recognizer")
-    print("=" * 60)
-    
-    tests = [
-        ("Импорты модулей", test_imports),
-        ("Доменные модели", test_domain_models),
-        ("SQLAlchemy модели", test_sqlalchemy_models),
-    ]
-    
-    passed = 0
-    total = len(tests)
-    
-    for test_name, test_func in tests:
-        print(f"\n📋 {test_name}")
-        print("-" * 40)
-        if test_func():
-            passed += 1
-            print(f"✅ {test_name}: ПРОШЕЛ")
-        else:
-            print(f"❌ {test_name}: ПРОВАЛЕН")
-    
-    print("\n" + "=" * 60)
-    print(f"🎯 РЕЗУЛЬТАТ: {passed}/{total} тестов прошли успешно")
-    
-    if passed == total:
-        print("🎉 ВСЕ ТЕСТЫ ПРОШЛИ! Система готова к использованию.")
-        print("\n📝 Следующие шаги:")
-        print("1. Запустите Docker Compose для БД: docker-compose up -d database")
-        print("2. Инициализируйте БД: python src/infrastructure/init_db.py")
-        print("3. Запустите тесты: pytest tests/")
-        return True
-    else:
-        print("⚠️  Некоторые тесты провалены. Проверьте ошибки выше.")
-        return False
+    def test_wallet_operations_flow(self, test_db):
+        user_repo = SQLAlchemyUserRepository(test_db)
+        wallet_repo = SQLAlchemyWalletRepository(test_db)
+        password_service = BCryptPasswordService()
+        
+        user_service = UserAuthService(user_repo, wallet_repo, password_service)
+        wallet_service = WalletManagementService(wallet_repo)
+        
+        user = user_service.register_user("test@example.com", "StrongPassword123!")
+        
+        initial_wallet = wallet_service.get_user_wallet(user)
+        assert initial_wallet.balance == Decimal("0")
+        
+        topup_transaction = wallet_service.top_up_wallet(user, Decimal("100.00"), "Initial deposit")
+        assert topup_transaction.amount == Decimal("100.00")
+        assert topup_transaction.post_balance == Decimal("100.00")
+        
+        updated_wallet = wallet_service.get_user_wallet(user)
+        assert updated_wallet.balance == Decimal("100.00")
+        
+        charge_transaction = wallet_service.charge_for_task(user, Decimal("25.00"), uuid4())
+        assert charge_transaction.amount == Decimal("25.00")
+        assert charge_transaction.post_balance == Decimal("75.00")
+        
+        final_wallet = wallet_service.get_user_wallet(user)
+        assert final_wallet.balance == Decimal("75.00")
+        
+        transactions = wallet_service.get_transaction_history(user, 10)
+        assert len(transactions) == 2
+        assert transactions[0].amount == Decimal("25.00")  # Most recent first
+        assert transactions[1].amount == Decimal("100.00")
 
-if __name__ == "__main__":
-    success = main()
-    sys.exit(0 if success else 1)
+    def test_insufficient_funds_flow(self, test_db):
+        user_repo = SQLAlchemyUserRepository(test_db)
+        wallet_repo = SQLAlchemyWalletRepository(test_db)
+        password_service = BCryptPasswordService()
+        
+        user_service = UserAuthService(user_repo, wallet_repo, password_service)
+        wallet_service = WalletManagementService(wallet_repo)
+        
+        user = user_service.register_user("test@example.com", "StrongPassword123!")
+        
+        wallet_service.top_up_wallet(user, Decimal("10.00"), "Small deposit")
+        
+        with pytest.raises(ValueError, match="Недостаточно средств"):
+            wallet_service.charge_for_task(user, Decimal("50.00"), uuid4())
+        
+        wallet = wallet_service.get_user_wallet(user)
+        assert wallet.balance == Decimal("10.00")  # Balance unchanged
+
+    def test_password_change_flow(self, test_db):
+        user_repo = SQLAlchemyUserRepository(test_db)
+        wallet_repo = SQLAlchemyWalletRepository(test_db)
+        password_service = BCryptPasswordService()
+        
+        user_service = UserAuthService(user_repo, wallet_repo, password_service)
+        
+        user = user_service.register_user("test@example.com", "OldPassword123!")
+        
+        auth_with_old = user_service.authenticate_user("test@example.com", "OldPassword123!")
+        assert auth_with_old is not None
+        
+        success = user_service.change_password(user, "OldPassword123!", "NewPassword123!")
+        assert success is True
+        
+        auth_with_old_after_change = user_service.authenticate_user("test@example.com", "OldPassword123!")
+        assert auth_with_old_after_change is None
+        
+        auth_with_new = user_service.authenticate_user("test@example.com", "NewPassword123!")
+        assert auth_with_new is not None
+
+    def test_ml_model_repository_operations(self, test_db):
+        model_repo = SQLAlchemyMLModelRepository(test_db)
+        
+        model1 = model_repo.create_model("TrOCR v1", Decimal("5.00"), True)
+        model2 = model_repo.create_model("TrOCR v2", Decimal("7.50"), True)
+        inactive_model = model_repo.create_model("Old Model", Decimal("3.00"), False)
+        
+        found_model = model_repo.get_by_id(model1.id)
+        assert found_model.name == "TrOCR v1"
+        assert found_model.credit_cost == Decimal("5.00")
+        
+        active_models = model_repo.get_all_active()
+        assert len(active_models) == 2
+        active_names = [model.name for model in active_models]
+        assert "TrOCR v1" in active_names
+        assert "TrOCR v2" in active_names
+        assert "Old Model" not in active_names
+        
+        success = model_repo.deactivate_model(model1.id)
+        assert success is True
+        
+        active_models_after = model_repo.get_all_active()
+        assert len(active_models_after) == 1
+        assert active_models_after[0].name == "TrOCR v2"
+
+    def test_user_deactivation_flow(self, test_db):
+        user_repo = SQLAlchemyUserRepository(test_db)
+        wallet_repo = SQLAlchemyWalletRepository(test_db)
+        password_service = BCryptPasswordService()
+        
+        user_service = UserAuthService(user_repo, wallet_repo, password_service)
+        
+        user = user_service.register_user("test@example.com", "StrongPassword123!")
+        assert user.is_active is True
+        
+        auth_before = user_service.authenticate_user("test@example.com", "StrongPassword123!")
+        assert auth_before is not None
+        
+        deactivated_user = user_service.deactivate_user(user)
+        assert deactivated_user.is_active is False
+        
+        auth_after = user_service.authenticate_user("test@example.com", "StrongPassword123!")
+        assert auth_after is None
+
+    def test_email_change_flow(self, test_db):
+        user_repo = SQLAlchemyUserRepository(test_db)
+        wallet_repo = SQLAlchemyWalletRepository(test_db)
+        password_service = BCryptPasswordService()
+        
+        user_service = UserAuthService(user_repo, wallet_repo, password_service)
+        
+        user = user_service.register_user("old@example.com", "StrongPassword123!")
+        
+        updated_user = user_service.change_email(user, "new@example.com")
+        assert updated_user.email == "new@example.com"
+        
+        auth_with_new_email = user_service.authenticate_user("new@example.com", "StrongPassword123!")
+        assert auth_with_new_email is not None
+        
+        auth_with_old_email = user_service.authenticate_user("old@example.com", "StrongPassword123!")
+        assert auth_with_old_email is None
+
+    def test_duplicate_email_registration_prevention(self, test_db):
+        user_repo = SQLAlchemyUserRepository(test_db)
+        wallet_repo = SQLAlchemyWalletRepository(test_db)
+        password_service = BCryptPasswordService()
+        
+        user_service = UserAuthService(user_repo, wallet_repo, password_service)
+        
+        user_service.register_user("test@example.com", "FirstPassword123!")
+        
+        with pytest.raises(ValueError, match="уже существует"):
+            user_service.register_user("test@example.com", "SecondPassword123!")
+
+    def test_transaction_ordering(self, test_db):
+        user_repo = SQLAlchemyUserRepository(test_db)
+        wallet_repo = SQLAlchemyWalletRepository(test_db)
+        password_service = BCryptPasswordService()
+        
+        user_service = UserAuthService(user_repo, wallet_repo, password_service)
+        wallet_service = WalletManagementService(wallet_repo)
+        
+        user = user_service.register_user("test@example.com", "StrongPassword123!")
+        
+        wallet_service.top_up_wallet(user, Decimal("100.00"), "First topup")
+        wallet_service.charge_for_task(user, Decimal("25.00"), uuid4())
+        wallet_service.top_up_wallet(user, Decimal("50.00"), "Second topup")
+        wallet_service.charge_for_task(user, Decimal("10.00"), uuid4())
+        
+        transactions = wallet_service.get_transaction_history(user, 10)
+        assert len(transactions) == 4
+        
+        amounts = [t.amount for t in transactions]
+        assert amounts == [Decimal("10.00"), Decimal("50.00"), Decimal("25.00"), Decimal("100.00")]

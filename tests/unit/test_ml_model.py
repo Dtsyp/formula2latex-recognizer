@@ -4,7 +4,6 @@ from unittest.mock import Mock, patch
 import io
 from PIL import Image
 
-# Mock для ML модулей, чтобы тесты работали без реальной модели
 with patch.dict('sys.modules', {
     'transformers': Mock(),
     'torch': Mock(),
@@ -32,7 +31,6 @@ class TestFormula2LaTeXModel:
         assert model.device == "cpu"
 
     def test_validate_image_valid_base64(self):
-        # Создаем тестовое изображение
         image = Image.new('RGB', (100, 100), 'white')
         buffer = io.BytesIO()
         image.save(buffer, format='PNG')
@@ -56,7 +54,6 @@ class TestFormula2LaTeXModel:
         assert 'error' in result
 
     def test_validate_image_not_image(self):
-        # Base64 текста, не изображения
         text_base64 = base64.b64encode(b"not an image").decode('utf-8')
         
         model = Formula2LaTeXModel()
@@ -67,17 +64,15 @@ class TestFormula2LaTeXModel:
 
     @patch('model.Formula2LaTeXModel.load_model')
     def test_predict_success(self, mock_load_model):
-        # Mock модели
         mock_processor = Mock()
         mock_model = Mock()
-        mock_model.generate.return_value = [[1, 2, 3]]  # Mock token IDs
+        mock_model.generate.return_value = [[1, 2, 3]]
         mock_processor.decode.return_value = "x^2 + y^2"
         
         model = Formula2LaTeXModel()
         model.processor = mock_processor
         model.model = mock_model
         
-        # Создаем валидное изображение
         image = Image.new('RGB', (100, 100), 'white')
         buffer = io.BytesIO()
         image.save(buffer, format='PNG')
@@ -100,7 +95,6 @@ class TestFormula2LaTeXModel:
 
     @patch('model.Formula2LaTeXModel.load_model')
     def test_predict_model_error(self, mock_load_model):
-        # Mock модели с ошибкой
         mock_processor = Mock()
         mock_model = Mock()
         mock_model.generate.side_effect = Exception("Model error")
@@ -109,7 +103,6 @@ class TestFormula2LaTeXModel:
         model.processor = mock_processor
         model.model = mock_model
         
-        # Создаем валидное изображение
         image = Image.new('RGB', (100, 100), 'white')
         buffer = io.BytesIO()
         image.save(buffer, format='PNG')

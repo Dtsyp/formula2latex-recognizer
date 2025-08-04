@@ -6,7 +6,6 @@ import base64
 import io
 from PIL import Image
 
-# Mock telegram components
 with patch.dict('sys.modules', {
     'aiogram': Mock(),
     'aiohttp': Mock(),
@@ -24,7 +23,6 @@ with patch.dict('sys.modules', {
 class TestTelegramWorkflow:
     
     def create_test_image(self):
-        """Создание тестового изображения"""
         image = Image.new('RGB', (200, 100), 'white')
         buffer = io.BytesIO()
         image.save(buffer, format='PNG')
@@ -32,7 +30,6 @@ class TestTelegramWorkflow:
 
     @pytest.mark.asyncio
     async def test_start_command(self):
-        """Тест команды /start"""
         # Mock message and bot
         mock_message = Mock()
         mock_message.from_user.id = 123456
@@ -51,7 +48,6 @@ class TestTelegramWorkflow:
 
     @pytest.mark.asyncio
     async def test_help_command(self):
-        """Тест команды /help"""
         mock_message = Mock()
         mock_message.answer = AsyncMock()
         
@@ -68,7 +64,6 @@ class TestTelegramWorkflow:
     @pytest.mark.asyncio
     @patch('handlers.APIClient')
     async def test_register_command_success(self, mock_api_client):
-        """Тест успешной регистрации"""
         # Mock API client
         mock_client = Mock()
         mock_client.register_user = AsyncMock(return_value={

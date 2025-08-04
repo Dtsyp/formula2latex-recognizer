@@ -6,7 +6,6 @@ from sqlalchemy.orm import sessionmaker
 import pytest
 import pytest_postgresql
 
-# Добавляем backend/src в Python path
 backend_src_path = os.path.join(os.path.dirname(__file__), '..', 'backend', 'src')
 sys.path.insert(0, backend_src_path)
 
@@ -24,7 +23,6 @@ def test_db(postgresql):
     connection_string = f"postgresql://postgres@{postgresql.info.host}:{postgresql.info.port}/{postgresql.info.dbname}"
     engine = create_engine(connection_string)
     
-    # Create all tables
     Base.metadata.create_all(engine)
     
     TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -34,12 +32,10 @@ def test_db(postgresql):
         yield session
     finally:
         session.close()
-        # Clean up
         Base.metadata.drop_all(engine)
 
 @pytest.fixture
 def mock_rabbitmq():
-    """Mock RabbitMQ для тестов"""
     class MockRabbitMQ:
         def __init__(self):
             self.messages = []

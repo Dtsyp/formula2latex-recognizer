@@ -9,12 +9,10 @@ from infrastructure.repositories import UserRepository, WalletRepository, MLMode
 
 @pytest.fixture
 def client():
-    """FastAPI test client"""
     return TestClient(app)
 
 @pytest.fixture
 def demo_user_data():
-    """Demo user data for testing"""
     return {
         "email": "test@example.com",
         "password": "testpassword123"

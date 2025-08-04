@@ -3,7 +3,7 @@ from uuid import UUID
 from decimal import Decimal
 
 from domain.user import User
-from domain.wallet import Wallet, Transaction
+from domain.wallet import Wallet, Transaction, TopUpTransaction, SpendTransaction
 from domain.interfaces.repositories import WalletRepositoryInterface
 from domain.interfaces.services import WalletServiceInterface
 
@@ -53,7 +53,6 @@ class WalletManagementService(WalletServiceInterface):
         
         # Создаем транзакцию пополнения
         transaction = wallet.top_up(amount)
-        transaction.description = description
         
         # Сохраняем транзакцию
         saved_transaction = self._wallet_repo.add_transaction(transaction)
@@ -82,9 +81,7 @@ class WalletManagementService(WalletServiceInterface):
             raise ValueError(f"Недостаточно средств. Баланс: {wallet.balance}, требуется: {amount}")
         
         # Создаем транзакцию списания
-        transaction = wallet.charge(amount)
-        transaction.description = f"Списание за задачу {task_id}"
-        transaction.task_id = task_id
+        transaction = wallet.spend(amount)
         
         # Сохраняем транзакцию
         saved_transaction = self._wallet_repo.add_transaction(transaction)
@@ -150,12 +147,12 @@ class WalletManagementService(WalletServiceInterface):
         
         total_topped_up = sum(
             t.amount for t in transactions 
-            if t.transaction_type == "top_up"
+            if isinstance(t, TopUpTransaction)
         )
         
         total_charged = sum(
             t.amount for t in transactions 
-            if t.transaction_type == "charge"
+            if isinstance(t, SpendTransaction)
         )
         
         return {
