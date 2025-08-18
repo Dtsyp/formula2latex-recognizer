@@ -6,7 +6,7 @@ from uuid import UUID
 
 from domain.file import File as DomainFile
 from domain.user import User
-from infrastructure.messaging import RabbitMQManager
+from infrastructure.messaging import RabbitMQMessagingService
 from infrastructure.models import File
 from infrastructure.repositories import MLModelRepository, WalletRepository, TaskRepository
 

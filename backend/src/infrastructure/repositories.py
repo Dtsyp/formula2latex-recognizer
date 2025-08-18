@@ -104,7 +104,7 @@ class SQLAlchemyWalletRepository(WalletRepositoryInterface):
         self.db = db
 
     def get_by_owner_id(self, owner_id: UUID) -> Optional[DomainWallet]:
-        wallet_model = self.db.query(Wallet).filter(Wallet.owner_id == owner_id).first()
+        wallet_model = self.db.query(Wallet).filter(Wallet.owner_id == owner_id).order_by(Wallet.created_at.desc()).first()
         return self._model_to_domain(wallet_model) if wallet_model else None
 
     def create_wallet(self, owner_id: UUID, initial_balance: Decimal = Decimal("0")) -> DomainWallet:

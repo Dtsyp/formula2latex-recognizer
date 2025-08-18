@@ -68,7 +68,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                     className="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
                   >
                     <CreditCardIcon className="h-4 w-4" />
-                    <span>${wallet.balance.toFixed(2)}</span>
+                    <span>${(typeof wallet.balance === 'number' ? wallet.balance : parseFloat(wallet.balance)).toFixed(2)}</span>
                   </Link>
                 )}
 

@@ -66,7 +66,32 @@ export function validateEmail(email: string): boolean {
   return emailRegex.test(email);
 }
 
-export function validatePassword(password: string): {
+export function validatePassword(password: string): boolean {
+  if (password.length < 8) {
+    return false;
+  }
+  
+  if (!/[A-Z]/.test(password)) {
+    return false;
+  }
+  
+  if (!/[a-z]/.test(password)) {
+    return false;
+  }
+  
+  if (!/\d/.test(password)) {
+    return false;
+  }
+
+  // Check for special characters (matching backend)
+  if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+    return false;
+  }
+  
+  return true;
+}
+
+export function validatePasswordDetailed(password: string): {
   isValid: boolean;
   errors: string[];
 } {
@@ -86,6 +111,10 @@ export function validatePassword(password: string): {
   
   if (!/\d/.test(password)) {
     errors.push('Password must contain at least one number');
+  }
+
+  if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+    errors.push('Password must contain at least one special character');
   }
   
   return {

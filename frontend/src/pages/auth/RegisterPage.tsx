@@ -11,73 +11,59 @@ export function RegisterPage() {
   const navigate = useNavigate();
   const { register, isLoading } = useAuthStore();
   
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-  });
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [agreeTerms, setAgreeTerms] = useState(false);
   const [errors, setErrors] = useState<{ 
-    name?: string; 
     email?: string; 
     password?: string; 
     confirmPassword?: string; 
     general?: string;
+    terms?: string;
   }>({});
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    // Clear error when user starts typing
-    if (errors[name as keyof typeof errors]) {
-      setErrors(prev => ({ ...prev, [name]: undefined }));
-    }
-  };
 
   const validateForm = () => {
     const newErrors: typeof errors = {};
 
-    if (!formData.name.trim()) {
-      newErrors.name = 'Name is required';
-    } else if (formData.name.trim().length < 2) {
-      newErrors.name = 'Name must be at least 2 characters';
-    }
-
-    if (!formData.email) {
+    if (!email) {
       newErrors.email = 'Email is required';
-    } else if (!validateEmail(formData.email)) {
+    } else if (!validateEmail(email)) {
       newErrors.email = 'Please enter a valid email';
     }
 
-    if (!formData.password) {
+    if (!password) {
       newErrors.password = 'Password is required';
-    } else if (!validatePassword(formData.password)) {
-      newErrors.password = 'Password must be at least 8 characters with uppercase, lowercase, and number';
+    } else if (!validatePassword(password)) {
+      newErrors.password = 'Password must be at least 8 characters with uppercase, lowercase, number, and special character (!@#$%^&*(),.?":{}|<>)';
     }
 
-    if (!formData.confirmPassword) {
+    if (!confirmPassword) {
       newErrors.confirmPassword = 'Please confirm your password';
-    } else if (formData.password !== formData.confirmPassword) {
+    } else if (password !== confirmPassword) {
       newErrors.confirmPassword = 'Passwords do not match';
+    }
+
+    if (!agreeTerms) {
+      newErrors.terms = 'You must agree to the terms of service';
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const handleRegister = async () => {
     if (!validateForm()) return;
 
     try {
-      await register(formData.email, formData.password);
+      await register(email, password);
       navigate(ROUTES.DASHBOARD);
     } catch (error) {
       setErrors({ general: 'Registration failed. Please try again.' });
     }
   };
 
+  // ВАЖНО: НЕ ИСПОЛЬЗУЕМ <form> вообще, чтобы избежать form-data
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
@@ -101,7 +87,7 @@ export function RegisterPage() {
             <h3 className="text-lg font-medium text-gray-900 dark:text-white">Register</h3>
           </CardHeader>
           <CardContent>
-            <form className="space-y-6" onSubmit={handleSubmit}>
+            <div className="space-y-6">
               {errors.general && (
                 <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-md text-sm">
                   {errors.general}
@@ -109,25 +95,17 @@ export function RegisterPage() {
               )}
 
               <Input
-                id="name"
-                name="name"
-                type="text"
-                label="Full name"
-                value={formData.name}
-                onChange={handleInputChange}
-                error={errors.name}
-                placeholder="Enter your full name"
-                autoComplete="name"
-                required
-              />
-
-              <Input
                 id="email"
                 name="email"
                 type="email"
                 label="Email address"
-                value={formData.email}
-                onChange={handleInputChange}
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (errors.email) {
+                    setErrors(prev => ({ ...prev, email: undefined }));
+                  }
+                }}
                 error={errors.email}
                 placeholder="Enter your email"
                 autoComplete="email"
@@ -139,12 +117,17 @@ export function RegisterPage() {
                 name="password"
                 type="password"
                 label="Password"
-                value={formData.password}
-                onChange={handleInputChange}
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (errors.password) {
+                    setErrors(prev => ({ ...prev, password: undefined }));
+                  }
+                }}
                 error={errors.password}
                 placeholder="Create a password"
                 autoComplete="new-password"
-                helperText="Must be at least 8 characters with uppercase, lowercase, and number"
+                helperText="Must be at least 8 characters with uppercase, lowercase, number, and special character (!@#$%^&*(),.?&quot;:{}|&lt;&gt;)"
                 required
               />
 
@@ -153,8 +136,13 @@ export function RegisterPage() {
                 name="confirmPassword"
                 type="password"
                 label="Confirm password"
-                value={formData.confirmPassword}
-                onChange={handleInputChange}
+                value={confirmPassword}
+                onChange={(e) => {
+                  setConfirmPassword(e.target.value);
+                  if (errors.confirmPassword) {
+                    setErrors(prev => ({ ...prev, confirmPassword: undefined }));
+                  }
+                }}
                 error={errors.confirmPassword}
                 placeholder="Confirm your password"
                 autoComplete="new-password"
@@ -166,6 +154,13 @@ export function RegisterPage() {
                   id="agree-terms"
                   name="agree-terms"
                   type="checkbox"
+                  checked={agreeTerms}
+                  onChange={(e) => {
+                    setAgreeTerms(e.target.checked);
+                    if (errors.terms) {
+                      setErrors(prev => ({ ...prev, terms: undefined }));
+                    }
+                  }}
                   className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                   required
                 />
@@ -180,9 +175,12 @@ export function RegisterPage() {
                   </a>
                 </label>
               </div>
+              {errors.terms && (
+                <p className="text-sm text-red-600 dark:text-red-400">{errors.terms}</p>
+              )}
 
               <Button
-                type="submit"
+                onClick={handleRegister}
                 variant="primary"
                 className="w-full"
                 isLoading={isLoading}
@@ -190,7 +188,7 @@ export function RegisterPage() {
               >
                 {isLoading ? 'Creating account...' : 'Create account'}
               </Button>
-            </form>
+            </div>
           </CardContent>
         </Card>
       </div>

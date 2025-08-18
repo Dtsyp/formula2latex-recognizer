@@ -12,7 +12,8 @@ from domain.interfaces.repositories import (
 from domain.interfaces.services import (
     UserServiceInterface,
     PasswordServiceInterface,
-    MessagingServiceInterface
+    MessagingServiceInterface,
+    WalletServiceInterface
 )
 from domain.services.user_service import UserAuthService
 from domain.services.task_service import TaskManagementService
@@ -42,6 +43,15 @@ class DIContainer:
         self._instances[interface] = implementation
     
     def get(self, interface: Type):
+        # Handle string keys
+        if isinstance(interface, str):
+            if interface == "TaskManagementService":
+                interface = TaskManagementService
+            elif interface == "WalletManagementService":
+                interface = WalletManagementService
+            else:
+                raise ValueError(f"Unknown string service key: {interface}")
+                
         if interface in self._singletons:
             return self._get_singleton(interface)
         elif interface in self._instances:
@@ -81,12 +91,14 @@ class DIContainer:
                 password_service=self.get(PasswordServiceInterface)
             )
         elif implementation == TaskManagementService:
+            from domain.interfaces.ml_model import ImageValidatorInterface
+            from infrastructure.services.image_validator import ImageValidationService
             return TaskManagementService(
                 task_repo=self.get(TaskRepositoryInterface),
-                user_repo=self.get(UserRepositoryInterface),
-                wallet_repo=self.get(WalletRepositoryInterface),
-                ml_model_repo=self.get(MLModelRepositoryInterface),
-                messaging_service=self.get(MessagingServiceInterface)
+                model_repo=self.get(MLModelRepositoryInterface),
+                wallet_service=self.get(WalletServiceInterface),
+                message_broker=self.get(MessagingServiceInterface),
+                image_validator=ImageValidationService()
             )
         elif implementation == WalletManagementService:
             return WalletManagementService(
@@ -114,6 +126,7 @@ def get_container() -> DIContainer:
     container.register_singleton(MessagingServiceInterface, RabbitMQMessagingService)
     
     container.register_transient(UserServiceInterface, UserAuthService)
+    container.register_transient(WalletServiceInterface, WalletManagementService)
     container.register_transient("TaskManagementService", TaskManagementService)
     container.register_transient("WalletManagementService", WalletManagementService)
     

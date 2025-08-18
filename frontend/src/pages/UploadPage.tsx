@@ -62,8 +62,9 @@ export function UploadPage() {
     if (!selectedModelData) return;
 
     // Check wallet balance
-    if (!wallet || wallet.balance < selectedModelData.credit_cost) {
-      setError(`Insufficient credits. You need ${selectedModelData.credit_cost} credits but have ${wallet?.balance || 0}.`);
+    const walletBalance = wallet ? (typeof wallet.balance === 'number' ? wallet.balance : parseFloat(wallet.balance)) : 0;
+    if (!wallet || walletBalance < selectedModelData.credit_cost) {
+      setError(`Insufficient credits. You need ${selectedModelData.credit_cost} credits but have ${walletBalance}.`);
       return;
     }
 
@@ -93,9 +94,10 @@ export function UploadPage() {
         setResult(completedTask);
         // Update wallet balance
         if (wallet) {
+          const currentBalance = typeof wallet.balance === 'number' ? wallet.balance : parseFloat(wallet.balance);
           setWallet({
             ...wallet,
-            balance: wallet.balance - selectedModelData.credit_cost
+            balance: currentBalance - selectedModelData.credit_cost
           });
         }
       } else {
@@ -231,7 +233,7 @@ export function UploadPage() {
             <CardContent>
               <div className="text-center">
                 <p className="text-2xl font-bold text-blue-600">
-                  ${wallet?.balance.toFixed(2) || '0.00'}
+                  ${wallet ? (typeof wallet.balance === 'number' ? wallet.balance : parseFloat(wallet.balance)).toFixed(2) : '0.00'}
                 </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   Available credits

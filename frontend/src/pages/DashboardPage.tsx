@@ -39,7 +39,7 @@ export function DashboardPage() {
     },
     {
       name: 'Wallet Balance',
-      value: `$${wallet?.balance.toFixed(2) || '0.00'}`,
+      value: `$${wallet ? (typeof wallet.balance === 'number' ? wallet.balance : parseFloat(wallet.balance)).toFixed(2) : '0.00'}`,
       icon: CreditCardIcon,
       change: '-$12.50',
       changeType: 'decrease' as const,

@@ -2,7 +2,7 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 from infrastructure.database import SessionLocal, engine, Base
 from infrastructure.models import *
-from infrastructure.repositories import UserRepository, MLModelRepository, WalletRepository
+from infrastructure.repositories import SQLAlchemyUserRepository, SQLAlchemyMLModelRepository, SQLAlchemyWalletRepository
 import os
 
 def create_tables():
@@ -14,9 +14,9 @@ def init_demo_data():
     """Initialize database with demo data"""
     db = SessionLocal()
     try:
-        user_repo = UserRepository(db)
-        model_repo = MLModelRepository(db)
-        wallet_repo = WalletRepository(db)
+        user_repo = SQLAlchemyUserRepository(db)
+        model_repo = SQLAlchemyMLModelRepository(db)
+        wallet_repo = SQLAlchemyWalletRepository(db)
         
         # Check if demo data already exists
         existing_admin = user_repo.get_by_email("admin@formula2latex.com")
@@ -26,9 +26,10 @@ def init_demo_data():
         
         # Create demo admin
         print("👤 Creating demo admin...")
+        from api.auth import get_password_hash
         admin = user_repo.create_user(
             email="admin@formula2latex.com",
-            password="admin123",
+            password_hash=get_password_hash("admin123"),
             role="admin"
         )
         print(f"✅ Admin created: {admin.email}")
@@ -37,7 +38,7 @@ def init_demo_data():
         print("👤 Creating demo user...")
         user = user_repo.create_user(
             email="user@formula2latex.com",
-            password="user123"
+            password_hash=get_password_hash("user123")
         )
         print(f"✅ User created: {user.email}")
         

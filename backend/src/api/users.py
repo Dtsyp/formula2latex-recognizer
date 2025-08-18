@@ -42,7 +42,12 @@ async def login(
     Контроллер только преобразует HTTP запрос/ответ.
     Вся логика аутентификации делегирована в UserAuthService.
     """
-    user = user_service.authenticate_user(user_data.email, user_data.password)
+    print(f"DEBUG: Login attempt - email: {user_data.email}, password length: {len(user_data.password)}")
+    try:
+        user = user_service.authenticate_user(user_data.email, user_data.password)
+    except Exception as e:
+        print(f"DEBUG: Auth error: {e}")
+        raise
     
     if not user:
         raise HTTPException(

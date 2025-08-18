@@ -53,14 +53,9 @@ api.interceptors.response.use(
 // Auth API
 export const authAPI = {
   login: async (credentials: UserLogin): Promise<{ user: User; token: string; wallet: Wallet }> => {
-    const formData = new FormData();
-    formData.append('username', credentials.email);
-    formData.append('password', credentials.password);
-    
-    const response = await api.post<Token>('/auth/login', formData, {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
+    const response = await api.post<Token>('/auth/login', {
+      email: credentials.email,
+      password: credentials.password,
     });
     
     // Get user profile with the token
@@ -71,7 +66,7 @@ export const authAPI = {
     });
     
     // Get wallet info
-    const walletResponse = await api.get<Wallet>('/wallet/', {
+    const walletResponse = await api.get<{id: string; balance: string}>('/wallet', {
       headers: {
         Authorization: `Bearer ${response.data.access_token}`,
       },
@@ -80,7 +75,10 @@ export const authAPI = {
     return {
       user: userResponse.data,
       token: response.data.access_token,
-      wallet: walletResponse.data,
+      wallet: {
+        ...walletResponse.data,
+        balance: parseFloat(walletResponse.data.balance)
+      },
     };
   },
 
@@ -103,12 +101,15 @@ export const authAPI = {
 // Wallet API
 export const walletAPI = {
   getWallet: async (): Promise<Wallet> => {
-    const response = await api.get<Wallet>('/wallet/');
-    return response.data;
+    const response = await api.get<{id: string; balance: string}>('/wallet');
+    return {
+      ...response.data,
+      balance: parseFloat(response.data.balance)
+    };
   },
 
-  topUp: async (data: TopUpRequest): Promise<Wallet> => {
-    const response = await api.post<Wallet>('/wallet/top-up', data);
+  topUp: async (data: TopUpRequest): Promise<Transaction> => {
+    const response = await api.post<Transaction>('/wallet/top-up', data);
     return response.data;
   },
 
@@ -121,7 +122,7 @@ export const walletAPI = {
 // Models API
 export const modelsAPI = {
   getModels: async (): Promise<MLModel[]> => {
-    const response = await api.get<MLModel[]>('/models/');
+    const response = await api.get<MLModel[]>('/models');
     return response.data;
   },
 
@@ -134,7 +135,7 @@ export const modelsAPI = {
 // Tasks API
 export const tasksAPI = {
   getTasks: async (): Promise<Task[]> => {
-    const response = await api.get<Task[]>('/tasks/');
+    const response = await api.get<Task[]>('/tasks');
     return response.data;
   },
 

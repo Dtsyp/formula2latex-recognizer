@@ -2,6 +2,8 @@
 export interface User {
   id: string;
   email: string;
+  role: string;
+  is_active: boolean;
   created_at?: string;
 }
 
@@ -23,6 +25,9 @@ export interface Token {
 export interface Wallet {
   id: string;
   balance: number;
+  owner_id?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Transaction {

@@ -5,6 +5,7 @@ from api.auth import get_current_user, get_current_admin
 from api.schemas import WalletResponse, TransactionResponse, TopUpRequest
 from api.dependencies import get_wallet_service, get_user_service
 from domain.user import User
+from domain.wallet import TopUpTransaction
 from domain.services.wallet_service import WalletManagementService
 from domain.services.user_service import UserAuthService
 
@@ -29,11 +30,11 @@ async def get_wallet(
 @router.post("/top-up", response_model=TransactionResponse)
 async def top_up_wallet(
     request: TopUpRequest,
-    current_user: User = Depends(get_current_admin),
+    current_user: User = Depends(get_current_user),
     wallet_service: WalletManagementService = Depends(get_wallet_service)
 ):
     """
-    Пополнение кошелька (только для администраторов).
+    Пополнение кошелька (доступно всем авторизованным пользователям).
     
     Бизнес-логика делегирована в WalletManagementService.
     """
@@ -41,12 +42,12 @@ async def top_up_wallet(
         transaction = wallet_service.top_up_wallet(
             current_user, 
             request.amount, 
-            "Пополнение администратором"
+            "Пополнение кошелька"
         )
         
         return TransactionResponse(
             id=transaction.id,
-            type=transaction.transaction_type,
+            type="top_up",
             amount=transaction.amount,
             post_balance=transaction.post_balance,
             created_at=transaction.timestamp
@@ -88,7 +89,7 @@ async def admin_top_up_user(
         
         return TransactionResponse(
             id=transaction.id,
-            type=transaction.transaction_type,
+            type="admin_top_up",
             amount=transaction.amount,
             post_balance=transaction.post_balance,
             created_at=transaction.timestamp
@@ -115,7 +116,7 @@ async def get_transactions(
     return [
         TransactionResponse(
             id=txn.id,
-            type=txn.transaction_type,
+            type="top_up" if isinstance(txn, TopUpTransaction) else "spend",
             amount=txn.amount,
             post_balance=txn.post_balance,
             created_at=txn.timestamp

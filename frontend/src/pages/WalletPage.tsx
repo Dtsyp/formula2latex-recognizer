@@ -69,8 +69,15 @@ export function WalletPage() {
     setTopUpError(null);
 
     try {
-      const updatedWallet = await walletAPI.topUp({ amount });
-      setWallet(updatedWallet);
+      const transaction = await walletAPI.topUp({ amount });
+      
+      // Update wallet balance based on transaction
+      if (wallet) {
+        setWallet({
+          ...wallet,
+          balance: parseFloat(transaction.post_balance.toString())
+        });
+      }
       
       // Reload transactions to show the new one
       const transactionsData = await walletAPI.getTransactions();
@@ -128,7 +135,7 @@ export function WalletPage() {
                   Current Balance
                 </p>
                 <p className="text-4xl font-bold text-gray-900 dark:text-white">
-                  {formatCurrency(wallet?.balance || 0)}
+                  {formatCurrency(wallet ? (typeof wallet.balance === 'number' ? wallet.balance : parseFloat(wallet.balance)) : 0)}
                 </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                   Available for formula conversions

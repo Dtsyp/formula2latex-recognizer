@@ -11,53 +11,39 @@ export function LoginPage() {
   const navigate = useNavigate();
   const { login, isLoading } = useAuthStore();
   
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-  });
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ email?: string; password?: string; general?: string }>({});
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    // Clear error when user starts typing
-    if (errors[name as keyof typeof errors]) {
-      setErrors(prev => ({ ...prev, [name]: undefined }));
-    }
-  };
 
   const validateForm = () => {
     const newErrors: typeof errors = {};
 
-    if (!formData.email) {
+    if (!email) {
       newErrors.email = 'Email is required';
-    } else if (!validateEmail(formData.email)) {
+    } else if (!validateEmail(email)) {
       newErrors.email = 'Please enter a valid email';
     }
 
-    if (!formData.password) {
+    if (!password) {
       newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const handleLogin = async () => {
     if (!validateForm()) return;
 
     try {
-      await login(formData.email, formData.password);
+      await login(email, password);
       navigate(ROUTES.DASHBOARD);
     } catch (error) {
       setErrors({ general: 'Invalid email or password' });
     }
   };
 
+  // ВАЖНО: НЕ ИСПОЛЬЗУЕМ <form> вообще, чтобы избежать form-data
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
@@ -81,7 +67,7 @@ export function LoginPage() {
             <h3 className="text-lg font-medium text-gray-900 dark:text-white">Login</h3>
           </CardHeader>
           <CardContent>
-            <form className="space-y-6" onSubmit={handleSubmit}>
+            <div className="space-y-6">
               {errors.general && (
                 <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-md text-sm">
                   {errors.general}
@@ -93,8 +79,13 @@ export function LoginPage() {
                 name="email"
                 type="email"
                 label="Email address"
-                value={formData.email}
-                onChange={handleInputChange}
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (errors.email) {
+                    setErrors(prev => ({ ...prev, email: undefined }));
+                  }
+                }}
                 error={errors.email}
                 placeholder="Enter your email"
                 autoComplete="email"
@@ -106,8 +97,13 @@ export function LoginPage() {
                 name="password"
                 type="password"
                 label="Password"
-                value={formData.password}
-                onChange={handleInputChange}
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (errors.password) {
+                    setErrors(prev => ({ ...prev, password: undefined }));
+                  }
+                }}
                 error={errors.password}
                 placeholder="Enter your password"
                 autoComplete="current-password"
@@ -135,7 +131,7 @@ export function LoginPage() {
               </div>
 
               <Button
-                type="submit"
+                onClick={handleLogin}
                 variant="primary"
                 className="w-full"
                 isLoading={isLoading}
@@ -143,7 +139,7 @@ export function LoginPage() {
               >
                 {isLoading ? 'Signing in...' : 'Sign in'}
               </Button>
-            </form>
+            </div>
           </CardContent>
         </Card>
       </div>
